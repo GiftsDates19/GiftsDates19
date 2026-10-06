@@ -1549,7 +1549,10 @@ async def list_profiles(
         olist = [o.strip() for o in orientation.split(",") if o.strip() and o.strip() != "all"]
         if olist:
             conds.append({"$or": [{"orientation": {"$in": olist}}, {"orientations": {"$in": olist}}]})
-    if language and language != "all": conds.append({"languages_spoken": language})
+    if language and language != "all":
+        # Multi-select: comma-separated language codes, match profiles speaking ANY of them
+        llist = [l.strip() for l in language.split(",") if l.strip() and l.strip() != "all"]
+        if llist: conds.append({"languages_spoken": {"$in": llist}})
     if zodiac and zodiac != "all": conds.append({"zodiac": zodiac})
     if available_date: conds.append({"availability": available_date})
     if video_calls: conds.append({"video_calls_enabled": {"$ne": False}})

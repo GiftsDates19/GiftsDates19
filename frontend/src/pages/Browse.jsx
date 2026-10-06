@@ -29,7 +29,7 @@ const VIP_EYE_COLORS = ["Brown", "Hazel", "Amber", "Green", "Blue", "Grey", "Bla
 const VIP_HAIR_COLORS = ["Black", "Dark brown", "Brown", "Light brown", "Blonde", "Platinum blonde", "Red", "Auburn", "Ginger", "Grey", "White", "Dyed / colourful"];
 const VIP_HAIRCUTS = ["Fully shaved", "Trimmed", "Landing strip", "Bikini line", "Natural / full", "Triangle"];
 const VIP_BREAST_SIZES = ["AA", "A", "B", "C", "D", "DD", "E", "F", "G", "H+", "Natural", "Enhanced"];
-const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, min_income: "", max_income: "", language: ALL, bust_size: ALL, penis_size: ALL, orientations: [], zodiac: ALL,
+const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, min_income: "", max_income: "", languages: [], bust_size: ALL, penis_size: ALL, orientations: [], zodiac: ALL,
   min_height: "", max_height: "", min_weight: "", max_weight: "", hobby: "", job: "", max_date_price: "", available_date: "", video_calls: false, premium_only: false, vip_only: false, with_photos: false, verified_only: false, online_now: false,
   vip_categories: [], vip_services: [], vip_min_price: "", vip_max_price: "", vip_date: "",
   vip_eye_color: ALL, vip_hair_color: ALL, vip_intimate_haircut: ALL, vip_breast_size: ALL,
@@ -103,6 +103,7 @@ export default function Browse() {
       const params = { ...filters, page: pageNum };
       if (Array.isArray(params.vip_categories)) { if (params.vip_categories.length) params.vip_categories = params.vip_categories.join(","); else delete params.vip_categories; }
       if (Array.isArray(params.vip_services)) { if (params.vip_services.length) params.vip_services = params.vip_services.join("||"); else delete params.vip_services; }
+      if (Array.isArray(params.languages)) { if (params.languages.length) params.language = params.languages.join(","); delete params.languages; }
       if (Array.isArray(params.orientations)) { if (params.orientations.length) params.orientation = params.orientations.join(","); delete params.orientations; }
       if (Array.isArray(params.genders)) { if (params.genders.length) params.genders = params.genders.join(","); else delete params.genders; }
       Object.keys(params).forEach(k => (params[k] === ALL || params[k] === "" || params[k] == null || params[k] === false) && delete params[k]);
@@ -283,7 +284,21 @@ export default function Browse() {
                 <FilterSelect testid="filter-religion-select" field="religion" label={t("religion", lang)} value={filters.religion} options={RELIGIONS.filter(r => r !== "prefer_not")} onChange={v => setFilters({ ...filters, religion: v })} lang={lang} />
                 <NumInput testid="filter-min-income-input" label={`${t("income", lang)} $/month · ${t("min", lang)}`} min="0" value={filters.min_income} onChange={v => setFilters({ ...filters, min_income: v })} />
                 <NumInput testid="filter-max-income-input" label={`${t("income", lang)} $/month · ${t("max", lang)}`} min="0" value={filters.max_income} onChange={v => setFilters({ ...filters, max_income: v })} />
-                <FilterSelect testid="filter-language-select" field="language" label={t("language_filter", lang)} value={filters.language} options={LANGUAGES.map(l => l.code)} labelFn={c => { const l = LANGUAGES.find(x => x.code === c); return `${l.flag} ${l.name}`; }} onChange={v => setFilters({ ...filters, language: v })} lang={lang} />
+                <div className="min-w-[200px]">
+                  <label className="text-xs text-slate-400">{t("language_filter", lang)}</label>
+                  <div className="mt-1">
+                    <MultiSelect
+                      testid="filter-language-select"
+                      value={filters.languages}
+                      onChange={v => setFilters({ ...filters, languages: v })}
+                      options={LANGUAGES.map(l => ({ value: l.code, label: `${l.flag} ${l.name}` }))}
+                      placeholder={t("all", lang)}
+                      searchPlaceholder={t("search", lang)}
+                      emptyText={t("no_results", lang)}
+                      accent="rose"
+                    />
+                  </div>
+                </div>
                 <FilterSelect testid="filter-zodiac-select" field="zodiac" label={t("zodiac", lang)} value={filters.zodiac} options={ZODIAC_SIGNS} labelFn={z => `${ZODIAC_EMOJI[z] || ""} ${t("zod_" + z, lang)}`} onChange={v => setFilters({ ...filters, zodiac: v })} lang={lang} />
               </div>
               <div className="flex flex-wrap gap-3 items-end">
