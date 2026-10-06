@@ -29,7 +29,7 @@ const VIP_EYE_COLORS = ["Brown", "Hazel", "Amber", "Green", "Blue", "Grey", "Bla
 const VIP_HAIR_COLORS = ["Black", "Dark brown", "Brown", "Light brown", "Blonde", "Platinum blonde", "Red", "Auburn", "Ginger", "Grey", "White", "Dyed / colourful"];
 const VIP_HAIRCUTS = ["Fully shaved", "Trimmed", "Landing strip", "Bikini line", "Natural / full", "Triangle"];
 const VIP_BREAST_SIZES = ["AA", "A", "B", "C", "D", "DD", "E", "F", "G", "H+", "Natural", "Enhanced"];
-const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, min_income: "", max_income: "", languages: [], bust_size: ALL, penis_size: ALL, orientations: [], zodiac: ALL,
+const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, min_income: "", max_income: "", languages: [], bust_size: ALL, min_penis: "", max_penis: "", orientations: [], zodiac: ALL,
   min_height: "", max_height: "", min_weight: "", max_weight: "", hobby: "", job: "", max_date_price: "", available_date: "", video_calls: false, premium_only: false, vip_only: false, with_photos: false, verified_only: false, online_now: false,
   vip_categories: [], vip_services: [], vip_min_price: "", vip_max_price: "", vip_date: "",
   vip_eye_color: ALL, vip_hair_color: ALL, vip_intimate_haircut: ALL, vip_breast_size: ALL,
@@ -311,7 +311,10 @@ export default function Browse() {
                 <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("job_title", lang)}</label>
                   <Input data-testid="filter-job-input" value={filters.job} onChange={e => setFilters({ ...filters, job: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
                 {(filters.genders.length === 0 || filters.genders.some(g => g !== "male")) && <FilterSelect testid="filter-bust-select" field="bust_size" label={t("bust_size", lang)} value={filters.bust_size} options={BUST} onChange={v => setFilters({ ...filters, bust_size: v })} lang={lang} />}
-                {(filters.genders.length === 0 || filters.genders.some(g => g !== "female")) && <FilterSelect testid="filter-penis-select" field="penis_size" label={t("penis_size", lang)} value={filters.penis_size} options={SIZES} onChange={v => setFilters({ ...filters, penis_size: v })} lang={lang} />}
+                {(filters.genders.length === 0 || filters.genders.some(g => g !== "female")) && (<>
+                  <NumInput testid="filter-min-penis-input" label={`${t("penis_size", lang)} · ${t("min", lang)}`} min="1" max="60" value={filters.min_penis} onChange={v => setFilters({ ...filters, min_penis: v })} />
+                  <NumInput testid="filter-max-penis-input" label={`${t("penis_size", lang)} · ${t("max", lang)}`} min="1" max="60" value={filters.max_penis} onChange={v => setFilters({ ...filters, max_penis: v })} />
+                </>)}
               </div>
               {/* VIP private search is available as a popup — press the "VIP only" switch above */}
               <div className="flex flex-wrap gap-2 items-center">
