@@ -1682,6 +1682,43 @@ async def list_profiles(
     return {"items": results[start:start + page_size], "page": page, "page_size": page_size,
             "has_more": start + page_size < total}
 
+# ---------- Saved searches (Premium / VIP) ----------
+SAVED_SEARCH_LIMIT = 20
+
+class SavedSearchReq(BaseModel):
+    name: str
+    filters: dict
+
+def _require_full_premium(user: dict):
+    if not (is_premium(user) or is_vip(user)): raise HTTPException(403, "PREMIUM_REQUIRED")
+
+@api.get("/saved-searches")
+async def list_saved_searches(user=Depends(get_current_user)):
+    _require_full_premium(user)
+    return await db.saved_searches.find({"user_id": user["id"]}, {"_id": 0, "user_id": 0}).sort("created_at", -1).to_list(SAVED_SEARCH_LIMIT)
+
+@api.post("/saved-searches")
+async def create_saved_search(req: SavedSearchReq, user=Depends(get_current_user)):
+    _require_full_premium(user)
+    name = (req.name or "").strip()[:40]
+    if not name: raise HTTPException(400, "NAME_REQUIRED")
+    if await db.saved_searches.count_documents({"user_id": user["id"]}) >= SAVED_SEARCH_LIMIT:
+        raise HTTPException(400, f"SAVED_SEARCH_LIMIT:{SAVED_SEARCH_LIMIT}")
+    # Keep only simple JSON values (str/num/bool/list of str) — no nested objects
+    clean = {k: v for k, v in (req.filters or {}).items()
+             if isinstance(k, str) and len(k) <= 40 and (isinstance(v, (str, int, float, bool)) or (isinstance(v, list) and all(isinstance(x, str) for x in v)))}
+    doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "name": name, "filters": clean, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.saved_searches.insert_one(doc)
+    doc.pop("_id", None); doc.pop("user_id", None)
+    return doc
+
+@api.delete("/saved-searches/{sid}")
+async def delete_saved_search(sid: str, user=Depends(get_current_user)):
+    _require_full_premium(user)
+    r = await db.saved_searches.delete_one({"id": sid, "user_id": user["id"]})
+    if not r.deleted_count: raise HTTPException(404, "NOT_FOUND")
+    return {"ok": True}
+
 def _vip_listing_card(p: dict) -> dict:
     """Build a browse card for a VIP listing. Separate listings are fully anonymised
     (own nickname/photos/age/city) so they can't be linked to the owner's main profile."""

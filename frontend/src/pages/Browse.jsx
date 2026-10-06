@@ -21,6 +21,7 @@ import { LANGUAGES, ZODIAC_EMOJI } from "../lib/i18n";
 import { Switch } from "../components/ui/switch";
 import CitySelect from "../components/CitySelect";
 import MultiSelect from "../components/MultiSelect";
+import SavedSearches from "../components/SavedSearches";
 import RangeSlider from "../components/RangeSlider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
 
@@ -42,6 +43,8 @@ const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, rel
 const LITE_DEFAULT = { intent: ALL, max_distance: "", available_date: "", max_date_price: "" };
 // Full Premium filters = everything else in EXTRA_DEFAULT + search by name
 const PREMIUM_DEFAULT = Object.fromEntries(Object.entries({ ...EXTRA_DEFAULT, q: "" }).filter(([k]) => !(k in LITE_DEFAULT)));
+
+const INITIAL_FILTERS = { q: "", city: "", country: "", genders: [], min_age: 18, max_age: 60, max_distance: "", sort: "", ...EXTRA_DEFAULT };
 
 const ZODIAC_SIGNS = ["aries", "taurus", "gemini", "cancer", "leo", "virgo", "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"];
 
@@ -85,7 +88,9 @@ export default function Browse() {
   const nav = useNavigate();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ q: "", city: "", country: "", genders: [], min_age: 18, max_age: 60, max_distance: "", sort: "", ...EXTRA_DEFAULT });
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const filtersRef = React.useRef(filters);
+  filtersRef.current = filters;
   const [showMore, setShowMore] = useState(false);
   const [vipOpen, setVipOpen] = useState(false);
   const [target, setTarget] = useState(null);
@@ -97,7 +102,8 @@ export default function Browse() {
   const [pageInfo, setPageInfo] = useState({ page: 1, page_size: 2, has_more: false });
   const [slideDir, setSlideDir] = useState(""); // "next" | "prev" — drives the page-change slide animation
   const touchRef = React.useRef(null);
-  const load = useCallback(async (pageArg) => {
+  const load = useCallback(async (pageArg, override) => {
+    const filters = override || filtersRef.current; // override = filters from a saved search (state update is async)
     const pageNum = typeof pageArg === "number" ? pageArg : 1; // Search / Enter always restarts at page 1
     setLoading(true);
     try {
@@ -211,6 +217,14 @@ export default function Browse() {
             </button>
           )}
         </div>
+        <SavedSearches
+          lang={lang}
+          enabled={isPremiumFull}
+          filters={filters}
+          defaults={INITIAL_FILTERS}
+          onUpgrade={() => nav("/wallet?premium=1")}
+          onApply={(saved) => { const merged = { ...INITIAL_FILTERS, ...saved }; setFilters(merged); setSlideDir(""); load(1, merged); }}
+        />
         {showMore && (
           <div className="glass rounded-2xl p-4 mb-6 space-y-5 float-in" data-testid="profile-more-filters-panel" onKeyDown={onEnter}>
             {/* ---------- Premium-Lite filters ---------- */}
