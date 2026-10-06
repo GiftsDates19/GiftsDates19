@@ -1,5 +1,6 @@
 import React from "react";
-import { Heart, Gift, Video, CalendarHeart, MapPin, BadgeCheck, Crown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Heart, Gift, Video, CalendarHeart, MapPin, BadgeCheck, Crown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
@@ -25,6 +26,9 @@ export default function ProfileCard({ p, onLike, onGift, onVideo, onDate, onMess
   const photos = p.photos?.length ? p.photos.map(fileUrl) : [FALLBACKS[Math.abs(hash(p.id)) % FALLBACKS.length]];
   const img = photos[Math.min(idx, photos.length - 1)];
   const step = (d) => setIdx((idx + d + photos.length) % photos.length);
+  // Shared hobbies between the viewer and this profile
+  const mine = new Set((user?.hobbies || []).map(h => String(h).toLowerCase()));
+  const shared = lockVip || p.id === user?.id ? [] : (p.hobbies || []).filter(h => mine.has(String(h).toLowerCase()));
   return (
     <div className={`group relative rounded-3xl overflow-hidden border card-lift bg-[#161320] ${p.is_vip ? "border-red-500/50 shadow-[0_0_30px_-8px_rgba(239,68,68,0.5)]" : p.is_premium ? "border-amber-400/50 shadow-[0_0_30px_-8px_rgba(251,191,36,0.45)]" : p.is_premium_lite ? "border-sky-400/50 shadow-[0_0_30px_-8px_rgba(56,189,248,0.45)]" : "border-white/10"}`} data-testid={`profile-card-${p.id}`}>
       <div className="aspect-[3/4] relative cursor-pointer" data-testid={`profile-card-open-${p.id}`} onClick={() => onOpen?.(p)}>
@@ -71,11 +75,29 @@ export default function ProfileCard({ p, onLike, onGift, onVideo, onDate, onMess
                   <MapPin size={10} /> {formatDistance(p.distance_km, t, lang)}
                 </p>
               )}
+              <div className="flex flex-wrap items-center gap-1.5">
+              {shared.length > 0 && (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span data-testid={`profile-card-shared-hobbies-${p.id}`} onClick={(e) => e.stopPropagation()}
+                        className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-[10px] font-medium text-emerald-200 shadow-[0_0_12px_-4px_rgba(52,211,153,0.6)] cursor-default">
+                        <Sparkles size={10} className="text-emerald-300" />
+                        {t(shared.length === 1 ? "hobbies_in_common_one" : "hobbies_in_common", lang).replace("{n}", shared.length)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent data-testid={`profile-card-shared-hobbies-list-${p.id}`} className="bg-[#161320] border border-emerald-400/30 text-emerald-100 text-xs max-w-[220px]">
+                      {shared.join(" · ")}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               {p.zodiac && (
                 <span data-testid={`profile-card-zodiac-${p.id}`} className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/30 text-[10px] text-violet-200">
                   <span aria-hidden="true">{ZODIAC_EMOJI[p.zodiac] || "✨"}</span> {t(`zod_${p.zodiac}`, lang)}
                 </span>
               )}
+              </div>
             </div>
           </div>
           {p.bio && <p className="mt-2 text-xs text-slate-400 line-clamp-2">{p.bio}</p>}
