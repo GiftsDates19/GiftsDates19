@@ -300,8 +300,9 @@ export default function Browse() {
                 <FilterSelect testid="filter-smoking-select" field="smoking" label={t("smoking", lang)} value={filters.smoking} options={HABITS} onChange={v => setFilters({ ...filters, smoking: v })} lang={lang} />
                 <FilterSelect testid="filter-drinking-select" field="drinking" label={t("drinking", lang)} value={filters.drinking} options={HABITS} onChange={v => setFilters({ ...filters, drinking: v })} lang={lang} />
                 <FilterSelect testid="filter-religion-select" field="religion" label={t("religion", lang)} value={filters.religion} options={RELIGIONS.filter(r => r !== "prefer_not")} onChange={v => setFilters({ ...filters, religion: v })} lang={lang} />
-                <NumInput testid="filter-min-income-input" label={`${t("income", lang)} $/month · ${t("min", lang)}`} min="0" value={filters.min_income} onChange={v => setFilters({ ...filters, min_income: v })} />
-                <NumInput testid="filter-max-income-input" label={`${t("income", lang)} $/month · ${t("max", lang)}`} min="0" value={filters.max_income} onChange={v => setFilters({ ...filters, max_income: v })} />
+                <RangeSlider testid="filter-income-range" label={`${t("income", lang)} $/month`} min={0} max={50000} step={500} lo={filters.min_income} hi={filters.max_income} anyLabel={t("all", lang)}
+                  format={v => `$${v >= 1000 ? (v / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 }) + "k" : v}`}
+                  onChange={(a, b) => setFilters(f => ({ ...f, min_income: a, max_income: b }))} />
                 <div className="min-w-[200px]">
                   <label className="text-xs text-slate-400">{t("language_filter", lang)}</label>
                   <div className="mt-1">
@@ -342,8 +343,7 @@ export default function Browse() {
                   </div>
                 )}
                 {(filters.genders.length === 0 || filters.genders.some(g => g !== "female")) && (<>
-                  <NumInput testid="filter-min-penis-input" label={`${t("penis_size", lang)} · ${t("min", lang)}`} min="1" max="60" value={filters.min_penis} onChange={v => setFilters({ ...filters, min_penis: v })} />
-                  <NumInput testid="filter-max-penis-input" label={`${t("penis_size", lang)} · ${t("max", lang)}`} min="1" max="60" value={filters.max_penis} onChange={v => setFilters({ ...filters, max_penis: v })} />
+                  <RangeSlider testid="filter-penis-range" label={t("penis_size", lang)} min={5} max={30} lo={filters.min_penis} hi={filters.max_penis} anyLabel={t("all", lang)} onChange={(a, b) => setFilters(f => ({ ...f, min_penis: a, max_penis: b }))} />
                 </>)}
               </div>
               {/* VIP private search is available as a popup — press the "VIP only" switch above */}

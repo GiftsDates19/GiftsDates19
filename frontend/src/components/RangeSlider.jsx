@@ -6,11 +6,11 @@ import * as SliderPrimitive from "@radix-ui/react-slider";
  * Empty string ("") for lo/hi means "no limit" — thumbs sit at the outer bounds.
  * onChange(lo, hi) returns "" for a side that is back at its bound, so no filter is sent.
  */
-export default function RangeSlider({ testid, label, min, max, step = 1, unit = "", lo, hi, onChange, anyLabel = "Any", disabled }) {
+export default function RangeSlider({ testid, label, min, max, step = 1, unit = "", lo, hi, onChange, anyLabel = "Any", disabled, format }) {
   const a = lo === "" || lo == null ? min : Number(lo);
   const b = hi === "" || hi == null ? max : Number(hi);
   const isAny = a <= min && b >= max;
-  const fmt = (v, bound) => `${v}${bound === max && v >= max ? "+" : ""}`;
+  const fmt = (v, bound) => `${format ? format(v) : v}${bound === max && v >= max ? "+" : ""}`;
   return (
     <div className="min-w-[230px] flex-1 max-w-[340px]" data-testid={testid}>
       <div className="flex items-center justify-between text-xs">
