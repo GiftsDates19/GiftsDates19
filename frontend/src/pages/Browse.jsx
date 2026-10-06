@@ -13,7 +13,7 @@ import VideoCallModal from "../components/VideoCallModal";
 import DateBookingModal from "../components/DateBookingModal";
 import InviteDateModal from "../components/InviteDateModal";
 import FeedBar from "../components/FeedBar";
-import { Search, ChevronDown, Crown, Lock } from "lucide-react";
+import { Search, ChevronDown, ChevronLeft, ChevronRight, Crown, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { INTENTS, KIDS, HABITS, RELIGIONS, INCOMES, BUST, SIZES, GENDERS, ORIENTATIONS, optLabel } from "../components/ProfileDetailsForm";
 import { VIP_CATEGORIES, catTitle, svcLabel } from "../lib/vipCatalog";
@@ -93,16 +93,21 @@ export default function Browse() {
   const loadQuota = () => api.get("/likes/quota").then(r => setQuota(r.data)).catch(() => {});
   useEffect(() => { loadQuota(); }, []);
 
-  const load = useCallback(async () => {
+  const [pageInfo, setPageInfo] = useState({ page: 1, page_size: 2, total: 0, total_pages: 1, has_more: false });
+  const load = useCallback(async (pageArg) => {
+    const pageNum = typeof pageArg === "number" ? pageArg : 1; // Search / Enter always restarts at page 1
     setLoading(true);
     try {
-      const params = { ...filters };
+      const params = { ...filters, page: pageNum };
       if (Array.isArray(params.vip_categories)) { if (params.vip_categories.length) params.vip_categories = params.vip_categories.join(","); else delete params.vip_categories; }
       if (Array.isArray(params.vip_services)) { if (params.vip_services.length) params.vip_services = params.vip_services.join("||"); else delete params.vip_services; }
       if (Array.isArray(params.genders)) { if (params.genders.length) params.genders = params.genders.join(","); else delete params.genders; }
       Object.keys(params).forEach(k => (params[k] === ALL || params[k] === "" || params[k] == null || params[k] === false) && delete params[k]);
       const { data } = await api.get("/profiles", { params });
-      setProfiles(data);
+      const items = Array.isArray(data) ? data : (data.items || []);
+      setProfiles(items);
+      if (!Array.isArray(data)) setPageInfo({ page: data.page, page_size: data.page_size, total: data.total, total_pages: data.total_pages, has_more: data.has_more });
+      if (pageNum > 1) window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       if (e.response?.data?.detail === "VIP_REQUIRED") { toast.error(t("vip_filter_locked", lang), { action: { label: "VIP", onClick: () => nav("/wallet?premium=1") } }); setFilters(f => ({ ...f, vip_only: false })); }
       else if (e.response?.data?.detail === "PREMIUM_REQUIRED") { toast.error(t("premium_filters_locked", lang), { action: { label: t("premium", lang), onClick: () => nav("/wallet?premium=1") } }); setFilters(f => ({ ...f, ...PREMIUM_DEFAULT })); }
@@ -114,7 +119,7 @@ export default function Browse() {
 
   // Run once on open; afterwards results refresh only when the Search button (or Enter) is pressed.
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const onEnter = (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") load(); };
+  const onEnter = (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") load(1); };
 
   const like = async (p) => {
     try {
@@ -166,7 +171,7 @@ export default function Browse() {
             <label className="text-xs text-slate-400">Max {t("age", lang)}</label>
             <Input data-testid="profile-max-age-input" type="number" min="18" max="99" value={filters.max_age} onChange={e => setFilters({ ...filters, max_age: parseInt(e.target.value||99) })} className="bg-white/5 border-white/10 mt-1" />
           </div>
-          <Button data-testid="profile-search-submit-button" onClick={load} disabled={loading} className="rose-btn text-white border-0 px-6"><Search size={15} className="me-1"/> {t("search_btn", lang)}</Button>
+          <Button data-testid="profile-search-submit-button" onClick={() => load(1)} disabled={loading} className="rose-btn text-white border-0 px-6"><Search size={15} className="me-1"/> {t("search_btn", lang)}</Button>
           <label className="flex items-center gap-2 text-xs text-red-200 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 cursor-pointer h-[38px]" data-testid="main-vip-only-wrap">
             <Switch data-testid="main-filter-vip-only" checked={filters.vip_only} onCheckedChange={v => {
               setFilters({ ...filters, vip_only: v });
@@ -272,7 +277,7 @@ export default function Browse() {
               </fieldset>
             </section>
             <div className="flex justify-end pt-1">
-              <Button data-testid="more-filters-search-button" onClick={load} disabled={loading} className="rose-btn text-white border-0 px-8 h-11"><Search size={16} className="me-1.5"/> {t("search_btn", lang)}</Button>
+              <Button data-testid="more-filters-search-button" onClick={() => load(1)} disabled={loading} className="rose-btn text-white border-0 px-8 h-11"><Search size={16} className="me-1.5"/> {t("search_btn", lang)}</Button>
             </div>
           </div>
         )}
@@ -286,6 +291,27 @@ export default function Browse() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {profiles.map(p => <ProfileCard key={p.id} p={p} onOpen={(p) => nav(`/profile/${p.id}`)} onLike={like} onGift={(p)=>open("gift",p)} onVideo={(p)=>open("video",p)} onDate={(p)=>open("date",p)} onMessage={()=>nav("/chats")} />)}
+          </div>
+        )}
+        {!loading && pageInfo.total > 0 && (
+          <div data-testid="browse-pagination" className="glass rounded-2xl mt-6 p-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-slate-400" data-testid="browse-page-size-info">
+              {t("per_page_info", lang).replace("{n}", pageInfo.page_size).replace("{t}", pageInfo.total)}
+              {!isVip && (
+                <button type="button" data-testid="browse-upgrade-more-results" onClick={() => nav("/wallet?premium=1")} className="ms-2 text-amber-300 hover:text-amber-200 underline-offset-2 hover:underline">
+                  <Crown size={12} className="inline me-1 -mt-0.5" />{t("upgrade_more_results", lang)}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button data-testid="browse-prev-page" variant="outline" disabled={pageInfo.page <= 1} onClick={() => load(pageInfo.page - 1)} className="bg-white/5 border-white/10 hover:bg-white/10 h-9">
+                <ChevronLeft size={16} className="me-1" /> {t("prev_page", lang)}
+              </Button>
+              <span data-testid="browse-page-indicator" className="text-sm text-slate-300 font-mono-num px-2">{pageInfo.page} / {pageInfo.total_pages}</span>
+              <Button data-testid="browse-next-page" disabled={!pageInfo.has_more} onClick={() => load(pageInfo.page + 1)} className="rose-btn text-white border-0 h-9">
+                {t("next_page", lang)} <ChevronRight size={16} className="ms-1" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -371,7 +397,7 @@ export default function Browse() {
               vip_min_dick: "", vip_max_dick: "", vip_min_girth: "", vip_max_girth: "",
               vip_price1h_min: "", vip_price1h_max: "", vip_price2h_min: "", vip_price2h_max: "", vip_price3h_min: "", vip_price3h_max: "" })}
               className="text-slate-400 hover:text-white">{t("reset", lang)}</Button>
-            <Button data-testid="vip-private-search-apply" onClick={() => { setVipOpen(false); load(); }} className="rose-btn text-white border-0"><Search size={14} className="me-1" /> {t("apply_filters", lang)}</Button>
+            <Button data-testid="vip-private-search-apply" onClick={() => { setVipOpen(false); load(1); }} className="rose-btn text-white border-0"><Search size={14} className="me-1" /> {t("apply_filters", lang)}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

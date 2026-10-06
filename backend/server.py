@@ -1502,7 +1502,7 @@ async def list_profiles(
     max_distance: Optional[int] = None, sort: Optional[str] = None,
     origin_lat: Optional[float] = None, origin_lng: Optional[float] = None,
     online_nearby: bool = False,
-    limit: int = 40, user=Depends(get_current_user)
+    limit: int = 40, page: int = 1, user=Depends(get_current_user)
 ):
     conds = [{"id": {"$ne": user["id"]}}, {"age": {"$gte": min_age, "$lte": max_age}},
              {"account_status": {"$nin": ["PAUSED", "PENDING_DELETION"]}}]
@@ -1612,11 +1612,15 @@ async def list_profiles(
     _not_premium = [{"$or": [{"premium_until": None}, {"premium_until": {"$lte": now_iso}}, {"premium_until": {"$exists": False}}]}]
     _not_lite = [{"$or": [{"premium_lite_until": None}, {"premium_lite_until": {"$lte": now_iso}}, {"premium_lite_until": {"$exists": False}}]}]
     # Top placement: Premium + VIP (both carry premium_until). Then Premium-lite placement. Then everyone else.
-    top = await db.users.find({"$and": conds + [{"premium_until": {"$gt": now_iso}}]}, proj).limit(limit).to_list(limit)
+    # Pagination: page size depends on the viewer's tier (server-enforced). Free 2 · Premium-Lite 4 · Premium 8 · VIP 12.
+    page_size = 12 if is_vip(user) else 8 if is_premium(user) else 4 if is_premium_lite(user) else 2
+    page = max(int(page or 1), 1)
+    limit = 1000  # candidate pool; ordered (top -> lite -> rest) then sliced per page below
+    top = await db.users.find({"$and": conds + [{"premium_until": {"$gt": now_iso}}]}, proj).sort("id", 1).limit(limit).to_list(limit)
     lite_limit = max(limit - len(top), 0)
-    lite = await db.users.find({"$and": conds + [{"premium_lite_until": {"$gt": now_iso}}] + _not_premium}, proj).limit(lite_limit).to_list(lite_limit) if lite_limit else []
+    lite = await db.users.find({"$and": conds + [{"premium_lite_until": {"$gt": now_iso}}] + _not_premium}, proj).sort("id", 1).limit(lite_limit).to_list(lite_limit) if lite_limit else []
     rest_limit = max(limit - len(top) - len(lite), 0)
-    rest = await db.users.find({"$and": conds + _not_premium + _not_lite}, proj).limit(rest_limit).to_list(rest_limit) if rest_limit else []
+    rest = await db.users.find({"$and": conds + _not_premium + _not_lite}, proj).sort("id", 1).limit(rest_limit).to_list(rest_limit) if rest_limit else []
     for p in top: p["is_premium"] = True; p["is_vip"] = is_vip(p); p["is_premium_lite"] = False
     for p in lite: p["is_premium"] = False; p["is_vip"] = False; p["is_premium_lite"] = True
     for p in rest: p["is_premium"] = False; p["is_vip"] = False; p["is_premium_lite"] = False
@@ -1650,7 +1654,11 @@ async def list_profiles(
     # Nearby sort: closest first (profiles without a distance go last)
     if (sort == "nearby" or online_nearby) and vlat is not None and vlng is not None:
         results.sort(key=lambda p: p.get("distance_km") if p.get("distance_km") is not None else float("inf"))
-    return results
+    total = len(results)
+    total_pages = max((total + page_size - 1) // page_size, 1)
+    start = (page - 1) * page_size
+    return {"items": results[start:start + page_size], "page": page, "page_size": page_size,
+            "total": total, "total_pages": total_pages, "has_more": start + page_size < total}
 
 def _vip_listing_card(p: dict) -> dict:
     """Build a browse card for a VIP listing. Separate listings are fully anonymised
