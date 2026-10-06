@@ -29,7 +29,7 @@ const VIP_EYE_COLORS = ["Brown", "Hazel", "Amber", "Green", "Blue", "Grey", "Bla
 const VIP_HAIR_COLORS = ["Black", "Dark brown", "Brown", "Light brown", "Blonde", "Platinum blonde", "Red", "Auburn", "Ginger", "Grey", "White", "Dyed / colourful"];
 const VIP_HAIRCUTS = ["Fully shaved", "Trimmed", "Landing strip", "Bikini line", "Natural / full", "Triangle"];
 const VIP_BREAST_SIZES = ["AA", "A", "B", "C", "D", "DD", "E", "F", "G", "H+", "Natural", "Enhanced"];
-const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, income: ALL, language: ALL, bust_size: ALL, penis_size: ALL, orientation: ALL, zodiac: ALL,
+const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, income: ALL, language: ALL, bust_size: ALL, penis_size: ALL, orientations: [], zodiac: ALL,
   min_height: "", max_height: "", min_weight: "", max_weight: "", hobby: "", job: "", max_date_price: "", available_date: "", video_calls: false, premium_only: false, vip_only: false, with_photos: false, verified_only: false, online_now: false,
   vip_categories: [], vip_services: [], vip_min_price: "", vip_max_price: "", vip_date: "",
   vip_eye_color: ALL, vip_hair_color: ALL, vip_intimate_haircut: ALL, vip_breast_size: ALL,
@@ -103,6 +103,7 @@ export default function Browse() {
       const params = { ...filters, page: pageNum };
       if (Array.isArray(params.vip_categories)) { if (params.vip_categories.length) params.vip_categories = params.vip_categories.join(","); else delete params.vip_categories; }
       if (Array.isArray(params.vip_services)) { if (params.vip_services.length) params.vip_services = params.vip_services.join("||"); else delete params.vip_services; }
+      if (Array.isArray(params.orientations)) { if (params.orientations.length) params.orientation = params.orientations.join(","); delete params.orientations; }
       if (Array.isArray(params.genders)) { if (params.genders.length) params.genders = params.genders.join(","); else delete params.genders; }
       Object.keys(params).forEach(k => (params[k] === ALL || params[k] === "" || params[k] == null || params[k] === false) && delete params[k]);
       const { data } = await api.get("/profiles", { params });
@@ -261,7 +262,21 @@ export default function Browse() {
                   <label className="text-xs text-slate-400 flex items-center gap-1"><Search size={12}/> {t("search_by_name", lang)}</label>
                   <Input data-testid="profile-search-input" value={filters.q} onChange={e => setFilters({ ...filters, q: e.target.value })} className="bg-white/5 border-white/10 mt-1" />
                 </div>
-                <FilterSelect testid="filter-orientation-select" field="orientation" label={t("orientation", lang)} value={filters.orientation} options={ORIENTATIONS.filter(o => o !== "prefer_not")} onChange={v => setFilters({ ...filters, orientation: v })} lang={lang} />
+                <div className="min-w-[200px]">
+                  <label className="text-xs text-slate-400">{t("orientation", lang)}</label>
+                  <div className="mt-1">
+                    <MultiSelect
+                      testid="filter-orientation-select"
+                      value={filters.orientations}
+                      onChange={v => setFilters({ ...filters, orientations: v })}
+                      options={ORIENTATIONS.filter(o => o !== "prefer_not").map(o => ({ value: o, label: optLabel("orientation", o, lang) }))}
+                      placeholder={t("all", lang)}
+                      searchPlaceholder={t("search", lang)}
+                      emptyText={t("no_results", lang)}
+                      accent="rose"
+                    />
+                  </div>
+                </div>
                 <FilterSelect testid="filter-kids-select" field="kids" label={t("kids", lang)} value={filters.kids} options={KIDS} onChange={v => setFilters({ ...filters, kids: v })} lang={lang} />
                 <FilterSelect testid="filter-smoking-select" field="smoking" label={t("smoking", lang)} value={filters.smoking} options={HABITS} onChange={v => setFilters({ ...filters, smoking: v })} lang={lang} />
                 <FilterSelect testid="filter-drinking-select" field="drinking" label={t("drinking", lang)} value={filters.drinking} options={HABITS} onChange={v => setFilters({ ...filters, drinking: v })} lang={lang} />

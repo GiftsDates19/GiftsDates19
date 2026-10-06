@@ -1544,7 +1544,10 @@ async def list_profiles(
     if intent and intent != "all":
         conds.append({"$or": [{"relationship_intent": intent}, {"relationship_intent": {"$in": [intent]}}]})
     if orientation and orientation != "all":
-        conds.append({"$or": [{"orientation": orientation}, {"orientations": orientation}]})
+        # Multi-select: comma-separated list, match profiles having ANY of the chosen orientations
+        olist = [o.strip() for o in orientation.split(",") if o.strip() and o.strip() != "all"]
+        if olist:
+            conds.append({"$or": [{"orientation": {"$in": olist}}, {"orientations": {"$in": olist}}]})
     if language and language != "all": conds.append({"languages_spoken": language})
     if zodiac and zodiac != "all": conds.append({"zodiac": zodiac})
     if available_date: conds.append({"availability": available_date})
