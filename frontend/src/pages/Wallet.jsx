@@ -103,7 +103,8 @@ export default function Wallet() {
           <PayoutAccountCard key={wallet.payout_account?.submitted_at || "new"} account={wallet.payout_account} onSaved={load} />
         </div>
 
-        <div className="glass rounded-2xl p-5">
+        {isPremium && (
+        <div className="glass rounded-2xl p-5" data-testid="wallet-premium-card">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center"><Crown className="text-amber-300"/></div>
@@ -122,6 +123,7 @@ export default function Wallet() {
                   : <Button data-testid="premium-cancel-autorenew" onClick={() => toggleAutoRenew(false)} variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10 text-slate-300">{t("cancel_autorenew", lang)}</Button>)}
           </div>
         </div>
+        )}
 
         {isVip && (
           <div className="glass rounded-2xl p-5 border border-rose-500/30" data-testid="vip-subscription-card">
