@@ -11,6 +11,7 @@ import { Coins, Lock, Wallet as WalletIcon, Crown, ArrowUpRight, ArrowDownRight,
 import { toast } from "sonner";
 import PayoutAccountCard from "../components/PayoutAccountCard";
 import PayoutStatusTracker from "../components/PayoutStatusTracker";
+import PlanComparison from "../components/PlanComparison";
 
 export default function Wallet() {
   const { user, lang, meta, refreshUser, spinEligible } = useApp();
@@ -66,6 +67,7 @@ export default function Wallet() {
   const isPremium = user?.premium_until && new Date(user.premium_until) > new Date();
   const isVip = user?.vip_until && new Date(user.vip_until) > new Date();
   const isPremiumLite = user?.premium_lite_until && new Date(user.premium_lite_until) > new Date();
+  const currentPlan = isVip ? "vip" : isPremium ? "premium" : isPremiumLite ? "lite" : "free";
   const vipAutoRenew = isVip && user?.vip_auto_renew !== false && !!user?.stripe_subscription_id;
 
   return (
@@ -159,6 +161,8 @@ export default function Wallet() {
           </div>
         )}
 
+
+        <PlanComparison lang={lang} meta={meta} current={currentPlan} onChoose={() => setPremOpen(true)} />
 
         <div className="glass rounded-2xl p-5">
           <h3 className="font-serif-luxe text-xl mb-3">{t("transactions", lang)}</h3>
@@ -274,6 +278,12 @@ export default function Wallet() {
             </div>
           </div>
           </div>
+          <details data-testid="dialog-plan-compare" className="mt-2 group/cmp">
+            <summary className="cursor-pointer list-none text-sm text-slate-300 hover:text-white flex items-center justify-center gap-1.5 py-2">
+              <span className="underline-offset-4 group-hover/cmp:underline">{t("plan_compare_all", lang)}</span>
+            </summary>
+            <div className="pt-2"><PlanComparison lang={lang} meta={meta} current={currentPlan} compact /></div>
+          </details>
         </DialogContent>
       </Dialog>
 
