@@ -1655,10 +1655,10 @@ async def list_profiles(
     if (sort == "nearby" or online_nearby) and vlat is not None and vlng is not None:
         results.sort(key=lambda p: p.get("distance_km") if p.get("distance_km") is not None else float("inf"))
     total = len(results)
-    total_pages = max((total + page_size - 1) // page_size, 1)
     start = (page - 1) * page_size
+    # Totals are intentionally not exposed — only whether a next page exists.
     return {"items": results[start:start + page_size], "page": page, "page_size": page_size,
-            "total": total, "total_pages": total_pages, "has_more": start + page_size < total}
+            "has_more": start + page_size < total}
 
 def _vip_listing_card(p: dict) -> dict:
     """Build a browse card for a VIP listing. Separate listings are fully anonymised

@@ -93,7 +93,7 @@ export default function Browse() {
   const loadQuota = () => api.get("/likes/quota").then(r => setQuota(r.data)).catch(() => {});
   useEffect(() => { loadQuota(); }, []);
 
-  const [pageInfo, setPageInfo] = useState({ page: 1, page_size: 2, total: 0, total_pages: 1, has_more: false });
+  const [pageInfo, setPageInfo] = useState({ page: 1, page_size: 2, has_more: false });
   const load = useCallback(async (pageArg) => {
     const pageNum = typeof pageArg === "number" ? pageArg : 1; // Search / Enter always restarts at page 1
     setLoading(true);
@@ -106,7 +106,7 @@ export default function Browse() {
       const { data } = await api.get("/profiles", { params });
       const items = Array.isArray(data) ? data : (data.items || []);
       setProfiles(items);
-      if (!Array.isArray(data)) setPageInfo({ page: data.page, page_size: data.page_size, total: data.total, total_pages: data.total_pages, has_more: data.has_more });
+      if (!Array.isArray(data)) setPageInfo({ page: data.page, page_size: data.page_size, has_more: data.has_more });
       if (pageNum > 1) window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       if (e.response?.data?.detail === "VIP_REQUIRED") { toast.error(t("vip_filter_locked", lang), { action: { label: "VIP", onClick: () => nav("/wallet?premium=1") } }); setFilters(f => ({ ...f, vip_only: false })); }
@@ -293,10 +293,10 @@ export default function Browse() {
             {profiles.map(p => <ProfileCard key={p.id} p={p} onOpen={(p) => nav(`/profile/${p.id}`)} onLike={like} onGift={(p)=>open("gift",p)} onVideo={(p)=>open("video",p)} onDate={(p)=>open("date",p)} onMessage={()=>nav("/chats")} />)}
           </div>
         )}
-        {!loading && pageInfo.total > 0 && (
+        {!loading && (profiles.length > 0 || pageInfo.page > 1) && (
           <div data-testid="browse-pagination" className="glass rounded-2xl mt-6 p-3 flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-slate-400" data-testid="browse-page-size-info">
-              {t("per_page_info", lang).replace("{n}", pageInfo.page_size).replace("{t}", pageInfo.total)}
+              {t("per_page_info", lang).replace("{n}", pageInfo.page_size)}
               {!isVip && (
                 <button type="button" data-testid="browse-upgrade-more-results" onClick={() => nav("/wallet?premium=1")} className="ms-2 text-amber-300 hover:text-amber-200 underline-offset-2 hover:underline">
                   <Crown size={12} className="inline me-1 -mt-0.5" />{t("upgrade_more_results", lang)}
@@ -307,7 +307,7 @@ export default function Browse() {
               <Button data-testid="browse-prev-page" variant="outline" disabled={pageInfo.page <= 1} onClick={() => load(pageInfo.page - 1)} className="bg-white/5 border-white/10 hover:bg-white/10 h-9">
                 <ChevronLeft size={16} className="me-1" /> {t("prev_page", lang)}
               </Button>
-              <span data-testid="browse-page-indicator" className="text-sm text-slate-300 font-mono-num px-2">{pageInfo.page} / {pageInfo.total_pages}</span>
+              <span data-testid="browse-page-indicator" className="text-sm text-slate-300 font-mono-num px-2">{t("page_label", lang)} {pageInfo.page}</span>
               <Button data-testid="browse-next-page" disabled={!pageInfo.has_more} onClick={() => load(pageInfo.page + 1)} className="rose-btn text-white border-0 h-9">
                 {t("next_page", lang)} <ChevronRight size={16} className="ms-1" />
               </Button>
