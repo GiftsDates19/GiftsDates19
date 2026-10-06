@@ -6,7 +6,9 @@ import { t } from "../lib/i18n";
 import { formatDistance } from "../lib/geolocate";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Send, ShieldAlert, Gift, Camera, Lock, MapPin, BadgeCheck } from "lucide-react";
+import { Send, ShieldAlert, Gift, Camera, Lock, MapPin, BadgeCheck, Languages, Loader2 } from "lucide-react";
+import { Switch } from "../components/ui/switch";
+import { LANGUAGES } from "../lib/i18n";
 import { toast } from "sonner";
 import GiftModal from "../components/GiftModal";
 import { fileUrl } from "../lib/api";
@@ -37,6 +39,27 @@ export default function Chats() {
   const fileRef = useRef();
   const [uploading, setUploading] = useState(false);
   const endRef = useRef();
+  // ---- Auto-translate partner messages into the member's chosen app language ----
+  const [autoTr, setAutoTr] = useState(() => localStorage.getItem("gd_chat_autotranslate") !== "0");
+  const [trMap, setTrMap] = useState({});          // message id -> translated text
+  const [showOrig, setShowOrig] = useState({});    // message id -> true when original is shown
+  const [trPending, setTrPending] = useState(false);
+  const checkedRef = useRef(new Set());            // ids already sent for translation (incl. same-language ones)
+  const inflightRef = useRef(false);
+  const langName = LANGUAGES.find(l => l.code === lang)?.name || lang;
+  const toggleAutoTr = (v) => { setAutoTr(v); localStorage.setItem("gd_chat_autotranslate", v ? "1" : "0"); };
+  useEffect(() => { setTrMap({}); setShowOrig({}); checkedRef.current = new Set(); }, [active, lang]);
+  useEffect(() => {
+    if (!autoTr || !active || inflightRef.current) return;
+    const need = msgs.filter(m => m.from_id !== user.id && (m.type === "text" || m.type === "gift") && m.text && !checkedRef.current.has(m.id));
+    if (!need.length) return;
+    inflightRef.current = true; setTrPending(true);
+    const cid = active;
+    api.post(`/conversations/${cid}/translate`, { lang })
+      .then(r => { if (cid !== active) return; need.forEach(m => checkedRef.current.add(m.id)); setTrMap(prev => ({ ...prev, ...r.data })); })
+      .catch(() => { need.forEach(m => checkedRef.current.add(m.id)); })
+      .finally(() => { inflightRef.current = false; setTrPending(false); });
+  }, [msgs, autoTr, active, lang]); // eslint-disable-line react-hooks/exhaustive-deps
   const reload = () => active && api.get(`/conversations/${active}/messages`).then(r => setMsgs(r.data));
   const sendPhoto = async (f) => {
     if (!f || !active) return;
@@ -100,8 +123,14 @@ export default function Chats() {
                   <div className="text-xs text-slate-400 flex items-center gap-1.5"><PresenceDot u={partner} lang={lang} testid="chat-header-presence" />{pres.label || partner.city}</div>
                 </div>
               </button>
+              <label data-testid="chat-autotranslate-toggle" title={t("chat_autotranslate_hint", lang).replace("{lang}", langName)}
+                className={`shrink-0 flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] cursor-pointer transition-colors ${autoTr ? "bg-sky-500/15 border-sky-400/40 text-sky-100" : "bg-white/5 border-white/10 text-slate-400 hover:text-slate-200"}`}>
+                {trPending ? <Loader2 size={13} className="animate-spin text-sky-300" /> : <Languages size={13} className={autoTr ? "text-sky-300" : ""} />}
+                <span className="hidden sm:inline">{t("chat_autotranslate", lang)} · {langName}</span>
+                <Switch data-testid="chat-autotranslate-switch" checked={autoTr} onCheckedChange={toggleAutoTr} className="scale-75 -my-1" />
+              </label>
               {partner.photos?.length > 1 && (
-                <div className="ml-auto flex gap-1" data-testid="chat-header-photos">
+                <div className="ml-2 flex gap-1" data-testid="chat-header-photos">
                   {partner.photos.slice(1, 5).map((p, i) => <img key={i} src={p} alt="" onClick={() => nav(`/profile/${partner.id}`)} className="w-8 h-8 rounded-lg object-cover border border-white/10 cursor-pointer hover:scale-110 transition-transform" />)}
                 </div>
               )}
@@ -119,7 +148,7 @@ export default function Chats() {
                     <div data-testid={`chat-gift-${m.id}`} className="text-center">
                       <div className="text-4xl leading-none">{m.gift_icon}</div>
                       <div className="text-[11px] mt-1 text-amber-300 font-mono-num">{m.from_id === user.id ? t("gift_sent_you", lang) : t("gift_received_chat", lang)} · 🪙 {m.gift_cost}</div>
-                      {m.text && <div className="mt-1 text-xs text-slate-200 italic">“{m.text}”</div>}
+                      {m.text && <div className="mt-1 text-xs text-slate-200 italic">“{autoTr && trMap[m.id] && !showOrig[m.id] ? trMap[m.id] : m.text}”</div>}
                       {m.from_id !== user.id && !m.thanks && (
                         <div className="mt-2 flex justify-center gap-1">
                           {["❤️", "😘", "🥰"].map(r => <button key={r} type="button" data-testid={`chat-gift-thanks-${m.id}-${r.codePointAt(0)}`} onClick={() => thanks(m.id, r)} className="px-2 py-1 rounded-full bg-white/10 hover:bg-rose-500/30 text-xs transition-colors">{t("thanks", lang)} {r}</button>)}
@@ -128,7 +157,16 @@ export default function Chats() {
                       {m.thanks && <div data-testid={`chat-gift-thanked-${m.id}`} className="mt-1 text-[10px] text-slate-400">{t("thanked", lang)} {m.thanks}</div>}
                     </div>
                   ) : m.type === "thanks" ? <span data-testid={`chat-thanks-${m.id}`}>{t("thanks", lang)} {m.reaction}</span>
-                  : m.type === "image" ? <img data-testid={`chat-image-${m.id}`} src={fileUrl(m.image_path)} alt="" className="max-h-64 rounded-xl object-cover cursor-zoom-in" onClick={() => window.open(fileUrl(m.image_path), "_blank")} /> : m.text}
+                  : m.type === "image" ? <img data-testid={`chat-image-${m.id}`} src={fileUrl(m.image_path)} alt="" className="max-h-64 rounded-xl object-cover cursor-zoom-in" onClick={() => window.open(fileUrl(m.image_path), "_blank")} />
+                  : (autoTr && trMap[m.id]) ? (
+                    <div data-testid={`chat-translated-${m.id}`}>
+                      <div>{showOrig[m.id] ? m.text : trMap[m.id]}</div>
+                      <button type="button" data-testid={`chat-toggle-original-${m.id}`} onClick={() => setShowOrig(o => ({ ...o, [m.id]: !o[m.id] }))}
+                        className="mt-1 flex items-center gap-1 text-[10px] text-sky-300/90 hover:text-sky-200">
+                        <Languages size={10} /> {showOrig[m.id] ? t("chat_show_translation", lang) : t("chat_translated_show_original", lang)}
+                      </button>
+                    </div>
+                  ) : m.text}
                 </div>
               </div>
             ))}

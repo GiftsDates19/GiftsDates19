@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from date_ideas_catalog import build_catalog, CAT_IMG
 from geo_coords import approx_coords
+import asyncio
 import os, uuid, logging, bcrypt, jwt, stripe, requests, re, secrets, httpx
 
 ROOT_DIR = Path(__file__).parent
@@ -1920,6 +1921,59 @@ async def send_chat_photo(cid: str, file: UploadFile = File(...), user=Depends(g
     await db.messages.insert_one(dict(msg))
     await db.conversations.update_one({"id": cid}, {"$set": {"last_message": "📷", "last_at": now}})
     return msg
+
+# ---------- Chat auto-translate (Gemini via Emergent LLM key) ----------
+class TranslateReq(BaseModel):
+    lang: str
+
+_translate_locks: dict = {}
+
+async def _llm_translate_batch(items: List[dict], lang_name: str) -> dict:
+    """items: [{id, text}] -> {id: translated_text}. Unchanged text is returned when already in the target language."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key or not items: return {}
+    import json as _json
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    sys_msg = (f"You are a translation engine for a dating app chat. Translate each message into {lang_name}. "
+               "Keep the tone, emojis, names and line breaks. Do not add explanations. "
+               "If a message is already in the target language, return it unchanged. "
+               "Reply ONLY with a JSON object mapping each id to its translation.")
+    chat = LlmChat(api_key=key, session_id=f"tr-{uuid.uuid4()}", system_message=sys_msg).with_model("gemini", "gemini-3-flash-preview")
+    payload = _json.dumps({it["id"]: it["text"] for it in items}, ensure_ascii=False)
+    raw = (await chat.send_message(UserMessage(text=payload)) or "").strip()
+    try:
+        data = _json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    except Exception:
+        logging.error(f"translate parse error: {raw[:200]}")
+        return {}
+    return {k: str(v) for k, v in data.items() if isinstance(k, str) and v is not None}
+
+@api.post("/conversations/{cid}/translate")
+async def translate_conversation(cid: str, req: TranslateReq, user=Depends(get_current_user)):
+    """Translate the partner's text messages in this conversation into `lang`. Results are cached per message."""
+    conv = await db.conversations.find_one({"id": cid})
+    if not conv or user["id"] not in conv["users"]: raise HTTPException(403, "No access")
+    code = (req.lang or "en").lower()[:10]
+    if not re.fullmatch(r"[a-z]{2,3}(-[a-z0-9]{2,4})?", code): raise HTTPException(400, "BAD_LANG")
+    lang_name = LANG_NAMES.get(code) or f"the language with ISO 639 code '{code}'"
+    field = f"translations.{code}"
+    q = {"conversation_id": cid, "from_id": {"$ne": user["id"]}, "type": {"$in": ["text", "gift"]}, "text": {"$nin": ["", None]}}
+    lock = _translate_locks.setdefault(f"{cid}:{code}", asyncio.Lock())
+    async with lock:
+        pending = await db.messages.find({**q, field: {"$exists": False}}, {"_id": 0, "id": 1, "text": 1}).sort("created_at", -1).to_list(40)
+        if pending:
+            try:
+                out = await _llm_translate_batch([{"id": m["id"], "text": m["text"][:2000]} for m in pending], lang_name)
+            except Exception as e:
+                logging.error(f"translate error: {e}")
+                raise HTTPException(503, "TRANSLATE_UNAVAILABLE")
+            for m in pending:
+                if m["id"] in out:
+                    await db.messages.update_one({"id": m["id"]}, {"$set": {field: out[m["id"]]}})
+    done = await db.messages.find({**q, field: {"$exists": True}}, {"_id": 0, "id": 1, "text": 1, "translations": 1}).to_list(500)
+    # Only return real translations (skip messages already in the reader's language)
+    return {m["id"]: m["translations"][code] for m in done
+            if (m.get("translations") or {}).get(code) and m["translations"][code].strip() != (m.get("text") or "").strip()}
 
 # ---------- Chat ----------
 @api.get("/conversations/{cid}/messages")
