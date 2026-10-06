@@ -192,13 +192,9 @@ export default function Browse() {
               />
             </div>
           </div>
-          <div className="min-w-[100px]">
-            <label className="text-xs text-slate-400">Min {t("age", lang)}</label>
-            <Input data-testid="profile-min-age-input" type="number" min="18" max="99" value={filters.min_age} onChange={e => setFilters({ ...filters, min_age: parseInt(e.target.value||18) })} className="bg-white/5 border-white/10 mt-1" />
-          </div>
-          <div className="min-w-[100px]">
-            <label className="text-xs text-slate-400">Max {t("age", lang)}</label>
-            <Input data-testid="profile-max-age-input" type="number" min="18" max="99" value={filters.max_age} onChange={e => setFilters({ ...filters, max_age: parseInt(e.target.value||99) })} className="bg-white/5 border-white/10 mt-1" />
+          <div className="min-w-[240px] flex-1 max-w-[320px] pb-0.5">
+            <RangeSlider testid="profile-age-range" label={t("age", lang)} min={18} max={99} lo={filters.min_age} hi={filters.max_age} anyLabel={`18 – 99+`}
+              onChange={(a, b) => setFilters(f => ({ ...f, min_age: a === "" ? 18 : parseInt(a), max_age: b === "" ? 99 : parseInt(b) }))} />
           </div>
           <Button data-testid="profile-search-submit-button" onClick={() => { setSlideDir(""); load(1); }} disabled={loading} className="rose-btn text-white border-0 px-6"><Search size={15} className="me-1"/> {t("search_btn", lang)}</Button>
           <label className="flex items-center gap-2 text-xs text-red-200 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 cursor-pointer h-[38px]" data-testid="main-vip-only-wrap">
