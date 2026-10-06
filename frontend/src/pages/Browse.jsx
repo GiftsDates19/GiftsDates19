@@ -13,7 +13,7 @@ import VideoCallModal from "../components/VideoCallModal";
 import DateBookingModal from "../components/DateBookingModal";
 import InviteDateModal from "../components/InviteDateModal";
 import FeedBar from "../components/FeedBar";
-import { Search, SlidersHorizontal, ChevronDown, Crown, Lock } from "lucide-react";
+import { Search, ChevronDown, Crown, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { INTENTS, KIDS, HABITS, RELIGIONS, INCOMES, BUST, SIZES, GENDERS, ORIENTATIONS, optLabel } from "../components/ProfileDetailsForm";
 import { VIP_CATEGORIES, catTitle, svcLabel } from "../lib/vipCatalog";
@@ -112,7 +112,9 @@ export default function Browse() {
     finally { setLoading(false); }
   }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { load(); }, [load]);
+  // Run once on open; afterwards results refresh only when the Search button (or Enter) is pressed.
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const onEnter = (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") load(); };
 
   const like = async (p) => {
     try {
@@ -132,7 +134,7 @@ export default function Browse() {
     <div className="aurora-bg min-h-[calc(100vh-4rem)]">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <FeedBar />
-        <div className="glass rounded-2xl p-4 mb-6 flex flex-wrap gap-3 items-end">
+        <div className="glass rounded-2xl p-4 mb-6 flex flex-wrap gap-3 items-end" onKeyDown={onEnter}>
           <div className="min-w-[140px]">
             <label className="text-xs text-slate-400">{t("country", lang)}</label>
             <CountrySelect testid="profile-country-filter-select" value={filters.country} onChange={v => setFilters({ ...filters, country: v === "Global" ? "" : v })} lang={lang} placeholder={t("any_country", lang)} />
@@ -164,7 +166,7 @@ export default function Browse() {
             <label className="text-xs text-slate-400">Max {t("age", lang)}</label>
             <Input data-testid="profile-max-age-input" type="number" min="18" max="99" value={filters.max_age} onChange={e => setFilters({ ...filters, max_age: parseInt(e.target.value||99) })} className="bg-white/5 border-white/10 mt-1" />
           </div>
-          <Button data-testid="profile-search-submit-button" onClick={load} className="rose-btn text-white border-0"><SlidersHorizontal size={14} className="me-1"/> {t("filters", lang)}</Button>
+          <Button data-testid="profile-search-submit-button" onClick={load} disabled={loading} className="rose-btn text-white border-0 px-6"><Search size={15} className="me-1"/> {t("search_btn", lang)}</Button>
           <label className="flex items-center gap-2 text-xs text-red-200 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 cursor-pointer h-[38px]" data-testid="main-vip-only-wrap">
             <Switch data-testid="main-filter-vip-only" checked={filters.vip_only} onCheckedChange={v => {
               setFilters({ ...filters, vip_only: v });
@@ -184,7 +186,7 @@ export default function Browse() {
           )}
         </div>
         {showMore && (
-          <div className="glass rounded-2xl p-4 mb-6 space-y-5 float-in" data-testid="profile-more-filters-panel">
+          <div className="glass rounded-2xl p-4 mb-6 space-y-5 float-in" data-testid="profile-more-filters-panel" onKeyDown={onEnter}>
             {/* ---------- Premium-Lite filters ---------- */}
             <section data-testid="premium-lite-filters-section" className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-sky-300"><Crown size={14} className="text-sky-300" /> {t("premium_lite_filters", lang)}</div>
@@ -269,6 +271,9 @@ export default function Browse() {
               </div>
               </fieldset>
             </section>
+            <div className="flex justify-end pt-1">
+              <Button data-testid="more-filters-search-button" onClick={load} disabled={loading} className="rose-btn text-white border-0 px-8 h-11"><Search size={16} className="me-1.5"/> {t("search_btn", lang)}</Button>
+            </div>
           </div>
         )}
 
