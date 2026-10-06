@@ -116,7 +116,7 @@ export default function Wallet() {
               </div>
             </div>
             {!isPremium
-              ? <Button data-testid="wallet-buy-premium-button" onClick={() => setPremOpen(true)} className="rose-btn text-white border-0">{t("buy_premium", lang)}</Button>
+              ? null
               : (user.premium_auto_renew === false
                   ? <Button data-testid="premium-enable-autorenew" onClick={() => toggleAutoRenew(true)} variant="outline" className="gold-btn">{t("enable_autorenew", lang)}</Button>
                   : <Button data-testid="premium-cancel-autorenew" onClick={() => toggleAutoRenew(false)} variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10 text-slate-300">{t("cancel_autorenew", lang)}</Button>)}
