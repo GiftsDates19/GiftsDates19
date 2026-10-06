@@ -37,6 +37,11 @@ const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, rel
   vip_min_dick: "", vip_max_dick: "", vip_min_girth: "", vip_max_girth: "",
   vip_price1h_min: "", vip_price1h_max: "", vip_price2h_min: "", vip_price2h_max: "", vip_price3h_min: "", vip_price3h_max: "" };
 
+// Premium-Lite tier filters (looking for, distance, available on date, date price up to)
+const LITE_DEFAULT = { intent: ALL, max_distance: "", available_date: "", max_date_price: "" };
+// Full Premium filters = everything else in EXTRA_DEFAULT + search by name
+const PREMIUM_DEFAULT = Object.fromEntries(Object.entries({ ...EXTRA_DEFAULT, q: "" }).filter(([k]) => !(k in LITE_DEFAULT)));
+
 const ZODIAC_SIGNS = ["aries", "taurus", "gemini", "cancer", "leo", "virgo", "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"];
 
 function FilterSelect({ testid, field, value, options, onChange, lang, label, labelFn }) {
@@ -74,10 +79,12 @@ export default function Browse() {
   const isPremium = user?.premium_until && new Date(user.premium_until) > new Date();
   const hasCoords = user?.lat != null && user?.lng != null;
   const isVip = user?.vip_until && new Date(user.vip_until) > new Date();
+  const isPremiumFull = !!(isPremium || isVip);
+  const isLite = !!(isPremiumFull || (user?.premium_lite_until && new Date(user.premium_lite_until) > new Date()));
   const nav = useNavigate();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ q: "", city: "", country: "", genders: [], min_age: 18, max_age: 60, max_distance: "", sort: "", online_nearby: false, ...EXTRA_DEFAULT });
+  const [filters, setFilters] = useState({ q: "", city: "", country: "", genders: [], min_age: 18, max_age: 60, max_distance: "", sort: "", ...EXTRA_DEFAULT });
   const [showMore, setShowMore] = useState(false);
   const [vipOpen, setVipOpen] = useState(false);
   const [target, setTarget] = useState(null);
@@ -98,7 +105,8 @@ export default function Browse() {
       setProfiles(data);
     } catch (e) {
       if (e.response?.data?.detail === "VIP_REQUIRED") { toast.error(t("vip_filter_locked", lang), { action: { label: "VIP", onClick: () => nav("/wallet?premium=1") } }); setFilters(f => ({ ...f, vip_only: false })); }
-      else if (e.response?.data?.detail === "PREMIUM_REQUIRED") { toast.error(t("premium_filters_locked", lang), { action: { label: t("premium", lang), onClick: () => nav("/wallet?premium=1") } }); setFilters(f => ({ ...f, ...EXTRA_DEFAULT })); }
+      else if (e.response?.data?.detail === "PREMIUM_REQUIRED") { toast.error(t("premium_filters_locked", lang), { action: { label: t("premium", lang), onClick: () => nav("/wallet?premium=1") } }); setFilters(f => ({ ...f, ...PREMIUM_DEFAULT })); }
+      else if (e.response?.data?.detail === "PREMIUM_LITE_REQUIRED") { toast.error(t("premium_lite_filters_locked", lang), { action: { label: "Premium-Lite", onClick: () => nav("/wallet?premium=1") } }); setFilters(f => ({ ...f, ...LITE_DEFAULT })); }
       else toast.error(t("failed_load", lang));
     }
     finally { setLoading(false); }
@@ -125,10 +133,6 @@ export default function Browse() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <FeedBar />
         <div className="glass rounded-2xl p-4 mb-6 flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[220px]">
-            <label className="text-xs text-slate-400 flex items-center gap-1"><Search size={12}/> {t("search_placeholder", lang)}</label>
-            <Input data-testid="profile-search-input" value={filters.q} onChange={e => setFilters({ ...filters, q: e.target.value })} className="bg-white/5 border-white/10 mt-1" />
-          </div>
           <div className="min-w-[140px]">
             <label className="text-xs text-slate-400">{t("country", lang)}</label>
             <CountrySelect testid="profile-country-filter-select" value={filters.country} onChange={v => setFilters({ ...filters, country: v === "Global" ? "" : v })} lang={lang} placeholder={t("any_country", lang)} />
@@ -160,26 +164,6 @@ export default function Browse() {
             <label className="text-xs text-slate-400">Max {t("age", lang)}</label>
             <Input data-testid="profile-max-age-input" type="number" min="18" max="99" value={filters.max_age} onChange={e => setFilters({ ...filters, max_age: parseInt(e.target.value||99) })} className="bg-white/5 border-white/10 mt-1" />
           </div>
-          <div className="min-w-[130px]">
-            <label className="text-xs text-slate-400">{t("distance_label", lang)}</label>
-            <Select value={filters.max_distance ? String(filters.max_distance) : ALL} onValueChange={v => setFilters({ ...filters, max_distance: v === ALL ? "" : parseInt(v) })} disabled={!hasCoords}>
-              <SelectTrigger data-testid="profile-distance-filter-select" className="bg-white/5 border-white/10 mt-1" title={!hasCoords ? t("location_needed_for_distance", lang) : undefined}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[#161320] border-white/10 text-white">
-                <SelectItem value={ALL}>{t("any_distance", lang)}</SelectItem>
-                {RADII.map(r => <SelectItem key={r} value={String(r)}>{t("within_km", lang).replace("{n}", r)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <button
-            type="button"
-            data-testid="profile-online-nearby-toggle"
-            disabled={!hasCoords}
-            title={!hasCoords ? t("location_needed_for_distance", lang) : undefined}
-            onClick={() => setFilters(f => ({ ...f, online_nearby: !f.online_nearby }))}
-            className={`h-[38px] mt-auto inline-flex items-center gap-1.5 px-3 rounded-lg text-xs border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${filters.online_nearby ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${filters.online_nearby ? "bg-emerald-400" : "bg-emerald-400/60"}`} /> {t("online_nearby", lang)}
-          </button>
           <Button data-testid="profile-search-submit-button" onClick={load} className="rose-btn text-white border-0"><SlidersHorizontal size={14} className="me-1"/> {t("filters", lang)}</Button>
           <label className="flex items-center gap-2 text-xs text-red-200 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 cursor-pointer h-[38px]" data-testid="main-vip-only-wrap">
             <Switch data-testid="main-filter-vip-only" checked={filters.vip_only} onCheckedChange={v => {
@@ -192,7 +176,7 @@ export default function Browse() {
               <Crown size={14} className="me-1 fill-red-500 text-red-500" /> {t("vip_private_search", lang)}
             </Button>
           )}
-          <Button data-testid="profile-more-filters-toggle" onClick={() => setShowMore(!showMore)} variant="outline" className={`bg-white/5 border-white/10 hover:bg-white/10 ${!isPremium ? "text-amber-300 border-amber-500/30" : ""}`}><ChevronDown size={14} className={`me-1 transition-transform ${showMore ? "rotate-180" : ""}`}/>{!isPremium && <Crown size={14} className="me-1 text-amber-300"/>} {t("more_filters", lang)}</Button>
+          <Button data-testid="profile-more-filters-toggle" onClick={() => setShowMore(!showMore)} variant="outline" className={`bg-white/5 border-white/10 hover:bg-white/10 ${!isLite ? "text-amber-300 border-amber-500/30" : ""}`}><ChevronDown size={14} className={`me-1 transition-transform ${showMore ? "rotate-180" : ""}`}/>{!isLite && <Crown size={14} className="me-1 text-amber-300"/>} {t("more_filters", lang)}</Button>
           {quota && !quota.premium && (
             <button data-testid="likes-quota-badge" onClick={() => nav("/wallet?premium=1")} className={`ms-auto px-3 py-2 rounded-full text-xs border font-mono-num ${quota.remaining === 0 ? "bg-rose-500/15 border-rose-500/40 text-rose-300" : "bg-white/5 border-white/10 text-slate-300"}`}>
               💗 {t("likes_left", lang).replace("{a}", quota.used).replace("{b}", quota.limit)}
@@ -200,54 +184,91 @@ export default function Browse() {
           )}
         </div>
         {showMore && (
-          <div className="glass rounded-2xl p-4 mb-6 space-y-3 float-in" data-testid="profile-more-filters-panel">
-            {!isPremium && (
-              <div data-testid="profile-filters-premium-lock" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex flex-wrap items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0"><Lock size={16} className="text-amber-300" /></div>
-                <div className="flex-1 min-w-[200px]">
-                  <div className="font-serif-luxe text-base">{t("premium_filters_locked", lang)}</div>
-                  <div className="text-xs text-slate-400">{t("premium_perks_short", lang)}</div>
+          <div className="glass rounded-2xl p-4 mb-6 space-y-5 float-in" data-testid="profile-more-filters-panel">
+            {/* ---------- Premium-Lite filters ---------- */}
+            <section data-testid="premium-lite-filters-section" className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-sky-300"><Crown size={14} className="text-sky-300" /> {t("premium_lite_filters", lang)}</div>
+              {!isLite && (
+                <div data-testid="premium-lite-filters-lock" className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 flex flex-wrap items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center shrink-0"><Lock size={16} className="text-sky-300" /></div>
+                  <div className="flex-1 min-w-[200px] font-serif-luxe text-base">{t("premium_lite_filters_locked", lang)}</div>
+                  <Button data-testid="premium-lite-filters-get" onClick={() => nav("/wallet?premium=1")} className="rose-btn text-white border-0 h-10"><Crown size={16} className="me-1" /> {t("buy_premium_lite", lang)}</Button>
                 </div>
-                <Button data-testid="profile-filters-get-premium" onClick={() => nav("/wallet?premium=1")} className="rose-btn text-white border-0 h-10"><Crown size={16} className="me-1" /> {t("buy_premium", lang)}</Button>
+              )}
+              <fieldset disabled={!isLite} data-testid="premium-lite-filters-controls" className={`border-0 p-0 m-0 min-w-0 ${!isLite ? "opacity-60 select-none" : ""}`}>
+                <div className="flex flex-wrap gap-3 items-end">
+                  <FilterSelect testid="filter-intent-select" field="relationship_intent" label={t("relationship_intent", lang)} value={filters.intent} options={INTENTS} onChange={v => setFilters({ ...filters, intent: v })} lang={lang} />
+                  <div className="min-w-[150px]">
+                    <label className="text-xs text-slate-400">{t("distance_label", lang)}</label>
+                    <Select value={filters.max_distance ? String(filters.max_distance) : ALL} onValueChange={v => setFilters({ ...filters, max_distance: v === ALL ? "" : parseInt(v) })} disabled={!isLite || !hasCoords}>
+                      <SelectTrigger data-testid="profile-distance-filter-select" className="bg-white/5 border-white/10 mt-1" title={!hasCoords ? t("location_needed_for_distance", lang) : undefined}><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-[#161320] border-white/10 text-white">
+                        <SelectItem value={ALL}>{t("any_distance", lang)}</SelectItem>
+                        {RADII.map(r => <SelectItem key={r} value={String(r)}>{t("within_km", lang).replace("{n}", r)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("available_on_date", lang)}</label>
+                    <Input data-testid="filter-available-date-input" type="date" value={filters.available_date} onChange={e => setFilters({ ...filters, available_date: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
+                  <NumInput testid="filter-max-date-price-input" label={t("max_date_price", lang)} min="0" value={filters.max_date_price} onChange={v => setFilters({ ...filters, max_date_price: v })} />
+                  {isLite && <Button data-testid="premium-lite-filters-reset" variant="ghost" onClick={() => setFilters({ ...filters, ...LITE_DEFAULT })} className="text-slate-400 hover:text-white ms-auto">{t("reset", lang)}</Button>}
+                </div>
+              </fieldset>
+            </section>
+
+            <div className="h-px bg-white/10" />
+
+            {/* ---------- Full Premium filters ---------- */}
+            <section data-testid="premium-filters-section" className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-300"><Crown size={14} className="text-amber-300" /> {t("premium_filters_title", lang)}</div>
+              {!isPremiumFull && (
+                <div data-testid="profile-filters-premium-lock" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex flex-wrap items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0"><Lock size={16} className="text-amber-300" /></div>
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="font-serif-luxe text-base">{t("premium_filters_locked", lang)}</div>
+                    <div className="text-xs text-slate-400">{t("premium_perks_short", lang)}</div>
+                  </div>
+                  <Button data-testid="profile-filters-get-premium" onClick={() => nav("/wallet?premium=1")} className="rose-btn text-white border-0 h-10"><Crown size={16} className="me-1" /> {t("buy_premium", lang)}</Button>
+                </div>
+              )}
+              <fieldset disabled={!isPremiumFull} data-testid="profile-more-filters-controls" className={`space-y-3 border-0 p-0 m-0 min-w-0 ${!isPremiumFull ? "opacity-60 select-none" : ""}`}>
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="flex-1 min-w-[220px]">
+                  <label className="text-xs text-slate-400 flex items-center gap-1"><Search size={12}/> {t("search_by_name", lang)}</label>
+                  <Input data-testid="profile-search-input" value={filters.q} onChange={e => setFilters({ ...filters, q: e.target.value })} className="bg-white/5 border-white/10 mt-1" />
+                </div>
+                <FilterSelect testid="filter-orientation-select" field="orientation" label={t("orientation", lang)} value={filters.orientation} options={ORIENTATIONS.filter(o => o !== "prefer_not")} onChange={v => setFilters({ ...filters, orientation: v })} lang={lang} />
+                <FilterSelect testid="filter-kids-select" field="kids" label={t("kids", lang)} value={filters.kids} options={KIDS} onChange={v => setFilters({ ...filters, kids: v })} lang={lang} />
+                <FilterSelect testid="filter-smoking-select" field="smoking" label={t("smoking", lang)} value={filters.smoking} options={HABITS} onChange={v => setFilters({ ...filters, smoking: v })} lang={lang} />
+                <FilterSelect testid="filter-drinking-select" field="drinking" label={t("drinking", lang)} value={filters.drinking} options={HABITS} onChange={v => setFilters({ ...filters, drinking: v })} lang={lang} />
+                <FilterSelect testid="filter-religion-select" field="religion" label={t("religion", lang)} value={filters.religion} options={RELIGIONS.filter(r => r !== "prefer_not")} onChange={v => setFilters({ ...filters, religion: v })} lang={lang} />
+                <FilterSelect testid="filter-income-select" field="income" label={t("income", lang)} value={filters.income} options={INCOMES.filter(r => r !== "prefer_not" && r !== "custom")} onChange={v => setFilters({ ...filters, income: v })} lang={lang} />
+                <FilterSelect testid="filter-language-select" field="language" label={t("language_filter", lang)} value={filters.language} options={LANGUAGES.map(l => l.code)} labelFn={c => { const l = LANGUAGES.find(x => x.code === c); return `${l.flag} ${l.name}`; }} onChange={v => setFilters({ ...filters, language: v })} lang={lang} />
+                <FilterSelect testid="filter-zodiac-select" field="zodiac" label={t("zodiac", lang)} value={filters.zodiac} options={ZODIAC_SIGNS} labelFn={z => `${ZODIAC_EMOJI[z] || ""} ${t("zod_" + z, lang)}`} onChange={v => setFilters({ ...filters, zodiac: v })} lang={lang} />
               </div>
-            )}
-            <fieldset disabled={!isPremium} data-testid="profile-more-filters-controls" className={`space-y-3 border-0 p-0 m-0 min-w-0 ${!isPremium ? "opacity-60 select-none" : ""}`}>
-            <div className="flex flex-wrap gap-3 items-end">
-              <FilterSelect testid="filter-intent-select" field="relationship_intent" label={t("relationship_intent", lang)} value={filters.intent} options={INTENTS} onChange={v => setFilters({ ...filters, intent: v })} lang={lang} />
-              <FilterSelect testid="filter-orientation-select" field="orientation" label={t("orientation", lang)} value={filters.orientation} options={ORIENTATIONS.filter(o => o !== "prefer_not")} onChange={v => setFilters({ ...filters, orientation: v })} lang={lang} />
-              <FilterSelect testid="filter-kids-select" field="kids" label={t("kids", lang)} value={filters.kids} options={KIDS} onChange={v => setFilters({ ...filters, kids: v })} lang={lang} />
-              <FilterSelect testid="filter-smoking-select" field="smoking" label={t("smoking", lang)} value={filters.smoking} options={HABITS} onChange={v => setFilters({ ...filters, smoking: v })} lang={lang} />
-              <FilterSelect testid="filter-drinking-select" field="drinking" label={t("drinking", lang)} value={filters.drinking} options={HABITS} onChange={v => setFilters({ ...filters, drinking: v })} lang={lang} />
-              <FilterSelect testid="filter-religion-select" field="religion" label={t("religion", lang)} value={filters.religion} options={RELIGIONS.filter(r => r !== "prefer_not")} onChange={v => setFilters({ ...filters, religion: v })} lang={lang} />
-              <FilterSelect testid="filter-income-select" field="income" label={t("income", lang)} value={filters.income} options={INCOMES.filter(r => r !== "prefer_not" && r !== "custom")} onChange={v => setFilters({ ...filters, income: v })} lang={lang} />
-              <FilterSelect testid="filter-language-select" field="language" label={t("language_filter", lang)} value={filters.language} options={LANGUAGES.map(l => l.code)} labelFn={c => { const l = LANGUAGES.find(x => x.code === c); return `${l.flag} ${l.name}`; }} onChange={v => setFilters({ ...filters, language: v })} lang={lang} />
-              <FilterSelect testid="filter-zodiac-select" field="zodiac" label={t("zodiac", lang)} value={filters.zodiac} options={ZODIAC_SIGNS} labelFn={z => `${ZODIAC_EMOJI[z] || ""} ${t("zod_" + z, lang)}`} onChange={v => setFilters({ ...filters, zodiac: v })} lang={lang} />
-            </div>
-            <div className="flex flex-wrap gap-3 items-end">
-              <NumInput testid="filter-min-height-input" label={`${t("height", lang)} · ${t("min", lang)}`} min="100" max="250" value={filters.min_height} onChange={v => setFilters({ ...filters, min_height: v })} />
-              <NumInput testid="filter-max-height-input" label={`${t("height", lang)} · ${t("max", lang)}`} min="100" max="250" value={filters.max_height} onChange={v => setFilters({ ...filters, max_height: v })} />
-              <NumInput testid="filter-min-weight-input" label={`${t("weight", lang)} · ${t("min", lang)}`} min="30" max="300" value={filters.min_weight} onChange={v => setFilters({ ...filters, min_weight: v })} />
-              <NumInput testid="filter-max-weight-input" label={`${t("weight", lang)} · ${t("max", lang)}`} min="30" max="300" value={filters.max_weight} onChange={v => setFilters({ ...filters, max_weight: v })} />
-              <NumInput testid="filter-max-date-price-input" label={t("max_date_price", lang)} min="0" value={filters.max_date_price} onChange={v => setFilters({ ...filters, max_date_price: v })} />
-              <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("hobby_filter", lang)}</label>
-                <Input data-testid="filter-hobby-input" value={filters.hobby} onChange={e => setFilters({ ...filters, hobby: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
-              <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("job_title", lang)}</label>
-                <Input data-testid="filter-job-input" value={filters.job} onChange={e => setFilters({ ...filters, job: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
-              <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("available_on_date", lang)}</label>
-                <Input data-testid="filter-available-date-input" type="date" value={filters.available_date} onChange={e => setFilters({ ...filters, available_date: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
-              {(filters.genders.length === 0 || filters.genders.some(g => g !== "male")) && <FilterSelect testid="filter-bust-select" field="bust_size" label={t("bust_size", lang)} value={filters.bust_size} options={BUST} onChange={v => setFilters({ ...filters, bust_size: v })} lang={lang} />}
-              {(filters.genders.length === 0 || filters.genders.some(g => g !== "female")) && <FilterSelect testid="filter-penis-select" field="penis_size" label={t("penis_size", lang)} value={filters.penis_size} options={SIZES} onChange={v => setFilters({ ...filters, penis_size: v })} lang={lang} />}
-            </div>
-            {/* VIP private search is available as a popup — press the "VIP only" switch above */}
-            <div className="flex flex-wrap gap-2 items-center">
-              <Toggle testid="filter-premium-only" label={`👑 ${t("premium_only", lang)}`} checked={filters.premium_only} onChange={v => setFilters({ ...filters, premium_only: v })} />
-              <Toggle testid="filter-online-now" label={`🟢 ${t("online_now", lang)}`} checked={filters.online_now} onChange={v => setFilters({ ...filters, online_now: v })} />
-              <Toggle testid="filter-with-photos" label={`📷 ${t("with_photos", lang)}`} checked={filters.with_photos} onChange={v => setFilters({ ...filters, with_photos: v })} />
-              <Toggle testid="filter-verified-only" label={`✅ ${t("verified_only", lang)}`} checked={filters.verified_only} onChange={v => setFilters({ ...filters, verified_only: v })} />
-              <Toggle testid="filter-video-calls" label={`📹 ${t("video_calls_available", lang)}`} checked={filters.video_calls} onChange={v => setFilters({ ...filters, video_calls: v })} />
-              {isPremium && <Button data-testid="profile-filters-reset-button" variant="ghost" onClick={() => setFilters({ ...filters, ...EXTRA_DEFAULT })} className="text-slate-400 hover:text-white ms-auto">{t("reset", lang)}</Button>}
-            </div>
-            </fieldset>
+              <div className="flex flex-wrap gap-3 items-end">
+                <NumInput testid="filter-min-height-input" label={`${t("height", lang)} · ${t("min", lang)}`} min="100" max="250" value={filters.min_height} onChange={v => setFilters({ ...filters, min_height: v })} />
+                <NumInput testid="filter-max-height-input" label={`${t("height", lang)} · ${t("max", lang)}`} min="100" max="250" value={filters.max_height} onChange={v => setFilters({ ...filters, max_height: v })} />
+                <NumInput testid="filter-min-weight-input" label={`${t("weight", lang)} · ${t("min", lang)}`} min="30" max="300" value={filters.min_weight} onChange={v => setFilters({ ...filters, min_weight: v })} />
+                <NumInput testid="filter-max-weight-input" label={`${t("weight", lang)} · ${t("max", lang)}`} min="30" max="300" value={filters.max_weight} onChange={v => setFilters({ ...filters, max_weight: v })} />
+                <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("hobby_filter", lang)}</label>
+                  <Input data-testid="filter-hobby-input" value={filters.hobby} onChange={e => setFilters({ ...filters, hobby: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
+                <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("job_title", lang)}</label>
+                  <Input data-testid="filter-job-input" value={filters.job} onChange={e => setFilters({ ...filters, job: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
+                {(filters.genders.length === 0 || filters.genders.some(g => g !== "male")) && <FilterSelect testid="filter-bust-select" field="bust_size" label={t("bust_size", lang)} value={filters.bust_size} options={BUST} onChange={v => setFilters({ ...filters, bust_size: v })} lang={lang} />}
+                {(filters.genders.length === 0 || filters.genders.some(g => g !== "female")) && <FilterSelect testid="filter-penis-select" field="penis_size" label={t("penis_size", lang)} value={filters.penis_size} options={SIZES} onChange={v => setFilters({ ...filters, penis_size: v })} lang={lang} />}
+              </div>
+              {/* VIP private search is available as a popup — press the "VIP only" switch above */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <Toggle testid="filter-premium-only" label={`👑 ${t("premium_only", lang)}`} checked={filters.premium_only} onChange={v => setFilters({ ...filters, premium_only: v })} />
+                <Toggle testid="filter-online-now" label={`🟢 ${t("online_now", lang)}`} checked={filters.online_now} onChange={v => setFilters({ ...filters, online_now: v })} />
+                <Toggle testid="filter-with-photos" label={`📷 ${t("with_photos", lang)}`} checked={filters.with_photos} onChange={v => setFilters({ ...filters, with_photos: v })} />
+                <Toggle testid="filter-verified-only" label={`✅ ${t("verified_only", lang)}`} checked={filters.verified_only} onChange={v => setFilters({ ...filters, verified_only: v })} />
+                <Toggle testid="filter-video-calls" label={`📹 ${t("video_calls_available", lang)}`} checked={filters.video_calls} onChange={v => setFilters({ ...filters, video_calls: v })} />
+                {isPremiumFull && <Button data-testid="profile-filters-reset-button" variant="ghost" onClick={() => setFilters({ ...filters, ...PREMIUM_DEFAULT })} className="text-slate-400 hover:text-white ms-auto">{t("reset", lang)}</Button>}
+              </div>
+              </fieldset>
+            </section>
           </div>
         )}
 

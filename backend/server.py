@@ -1506,11 +1506,17 @@ async def list_profiles(
 ):
     conds = [{"id": {"$ne": user["id"]}}, {"age": {"$gte": min_age, "$lte": max_age}},
              {"account_status": {"$nin": ["PAUSED", "PENDING_DELETION"]}}]
-    advanced_used = any(v not in (None, "", "all", False) for v in (intent, min_height, max_height, kids, smoking, religion, drinking, income, language, orientation,
-                                                                   hobby, job, min_weight, max_weight, bust_size, penis_size, max_date_price, premium_only, with_photos, verified_only, online_now,
-                                                                   zodiac, available_date, video_calls,
+    online_nearby = False  # "Online nearby" filter removed from search
+    # Free: country, city, gender, min/max age.
+    # Premium-Lite (and above): looking for (intent), distance, available on date, date price up to.
+    lite_used = any(v not in (None, "", "all", False, 0) for v in (intent, max_distance, available_date, max_date_price))
+    if lite_used and not has_premium(user): raise HTTPException(403, "PREMIUM_LITE_REQUIRED")
+    # Full Premium / VIP: search by name + every other advanced filter.
+    advanced_used = any(v not in (None, "", "all", False) for v in (q, min_height, max_height, kids, smoking, religion, drinking, income, language, orientation,
+                                                                   hobby, job, min_weight, max_weight, bust_size, penis_size, premium_only, with_photos, verified_only, online_now,
+                                                                   zodiac, video_calls,
                                                                    vip_categories, vip_min_price, vip_max_price, vip_date))
-    if advanced_used and not has_premium(user): raise HTTPException(403, "PREMIUM_REQUIRED")
+    if advanced_used and not (is_premium(user) or is_vip(user)): raise HTTPException(403, "PREMIUM_REQUIRED")
     vip_adv = bool(vip_categories or vip_services or (vip_min_price is not None) or (vip_max_price is not None) or vip_date
                    or vip_eye_color or vip_hair_color or vip_intimate_haircut or vip_breast_size
                    or (vip_min_height is not None) or (vip_max_height is not None) or (vip_min_weight is not None) or (vip_max_weight is not None)
