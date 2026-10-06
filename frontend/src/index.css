@@ -100,6 +100,10 @@ body {
 
 @keyframes float-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .float-in { animation: float-in .6s ease both; }
+@keyframes slide-in-next { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in-prev { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+.slide-in-next { animation: slide-in-next .35s ease both; }
+.slide-in-prev { animation: slide-in-prev .35s ease both; }
 
 .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(225,29,72,0.4); border-radius: 999px; }
@@ -127,4 +131,4 @@ body {
 .logo-glow { animation: logo-glow 3.6s ease-in-out infinite; }
 @keyframes logo-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 .logo-pulse { animation: logo-pulse 1.6s ease-in-out infinite; transform-origin: center; }
-@media (prefers-reduced-motion: reduce) { .logo-glow, .float-in, .pulse-dot, .logo-pulse { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .logo-glow, .float-in, .pulse-dot, .logo-pulse, .slide-in-next, .slide-in-prev { animation: none; } }

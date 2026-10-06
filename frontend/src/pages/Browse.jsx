@@ -94,6 +94,8 @@ export default function Browse() {
   useEffect(() => { loadQuota(); }, []);
 
   const [pageInfo, setPageInfo] = useState({ page: 1, page_size: 2, has_more: false });
+  const [slideDir, setSlideDir] = useState(""); // "next" | "prev" — drives the page-change slide animation
+  const touchRef = React.useRef(null);
   const load = useCallback(async (pageArg) => {
     const pageNum = typeof pageArg === "number" ? pageArg : 1; // Search / Enter always restarts at page 1
     setLoading(true);
@@ -119,6 +121,21 @@ export default function Browse() {
 
   // Run once on open; afterwards results refresh only when the Search button (or Enter) is pressed.
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const goPage = (dir) => {
+    if (loading) return;
+    if (dir === "next" && pageInfo.has_more) { setSlideDir("next"); load(pageInfo.page + 1); }
+    else if (dir === "prev" && pageInfo.page > 1) { setSlideDir("prev"); load(pageInfo.page - 1); }
+  };
+  // Mobile swipe paging: swipe left -> next page, swipe right -> previous page
+  const onTouchStart = (e) => { const t0 = e.touches[0]; touchRef.current = { x: t0.clientX, y: t0.clientY, time: Date.now() }; };
+  const onTouchEnd = (e) => {
+    const st = touchRef.current; touchRef.current = null;
+    if (!st) return;
+    const t1 = e.changedTouches[0];
+    const dx = t1.clientX - st.x, dy = t1.clientY - st.y;
+    if (Date.now() - st.time > 800 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // ignore scrolls / slow drags
+    goPage(dx < 0 ? "next" : "prev");
+  };
   const onEnter = (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") load(1); };
 
   const like = async (p) => {
@@ -171,7 +188,7 @@ export default function Browse() {
             <label className="text-xs text-slate-400">Max {t("age", lang)}</label>
             <Input data-testid="profile-max-age-input" type="number" min="18" max="99" value={filters.max_age} onChange={e => setFilters({ ...filters, max_age: parseInt(e.target.value||99) })} className="bg-white/5 border-white/10 mt-1" />
           </div>
-          <Button data-testid="profile-search-submit-button" onClick={() => load(1)} disabled={loading} className="rose-btn text-white border-0 px-6"><Search size={15} className="me-1"/> {t("search_btn", lang)}</Button>
+          <Button data-testid="profile-search-submit-button" onClick={() => { setSlideDir(""); load(1); }} disabled={loading} className="rose-btn text-white border-0 px-6"><Search size={15} className="me-1"/> {t("search_btn", lang)}</Button>
           <label className="flex items-center gap-2 text-xs text-red-200 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 cursor-pointer h-[38px]" data-testid="main-vip-only-wrap">
             <Switch data-testid="main-filter-vip-only" checked={filters.vip_only} onCheckedChange={v => {
               setFilters({ ...filters, vip_only: v });
@@ -277,7 +294,7 @@ export default function Browse() {
               </fieldset>
             </section>
             <div className="flex justify-end pt-1">
-              <Button data-testid="more-filters-search-button" onClick={() => load(1)} disabled={loading} className="rose-btn text-white border-0 px-8 h-11"><Search size={16} className="me-1.5"/> {t("search_btn", lang)}</Button>
+              <Button data-testid="more-filters-search-button" onClick={() => { setSlideDir(""); load(1); }} disabled={loading} className="rose-btn text-white border-0 px-8 h-11"><Search size={16} className="me-1.5"/> {t("search_btn", lang)}</Button>
             </div>
           </div>
         )}
@@ -289,12 +306,14 @@ export default function Browse() {
         ) : profiles.length === 0 ? (
           <div className="text-center py-24 text-slate-400" data-testid="browse-empty">{t("no_profiles", lang)}</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div data-testid="browse-results-grid" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+            key={`page-${pageInfo.page}`}
+            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 touch-pan-y ${slideDir === "next" ? "slide-in-next" : slideDir === "prev" ? "slide-in-prev" : ""}`}>
             {profiles.map(p => <ProfileCard key={p.id} p={p} onOpen={(p) => nav(`/profile/${p.id}`)} onLike={like} onGift={(p)=>open("gift",p)} onVideo={(p)=>open("video",p)} onDate={(p)=>open("date",p)} onMessage={()=>nav("/chats")} />)}
           </div>
         )}
         {!loading && (profiles.length > 0 || pageInfo.page > 1) && (
-          <div data-testid="browse-pagination" className="glass rounded-2xl mt-6 p-3 flex flex-wrap items-center justify-between gap-3">
+          <div data-testid="browse-pagination" className="glass rounded-2xl mt-6 max-sm:mb-20 p-3 flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-slate-400" data-testid="browse-page-size-info">
               {t("per_page_info", lang).replace("{n}", pageInfo.page_size)}
               {!isVip && (
@@ -303,12 +322,15 @@ export default function Browse() {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button data-testid="browse-prev-page" variant="outline" disabled={pageInfo.page <= 1} onClick={() => load(pageInfo.page - 1)} className="bg-white/5 border-white/10 hover:bg-white/10 h-9">
+            <div data-testid="browse-swipe-hint" className="w-full sm:hidden flex items-center justify-center gap-1.5 text-[11px] text-slate-500 order-first">
+              <ChevronLeft size={12} /> {t("swipe_to_change_page", lang)} <ChevronRight size={12} />
+            </div>
+            <div className="flex items-center gap-2 max-sm:w-full max-sm:justify-between">
+              <Button data-testid="browse-prev-page" variant="outline" disabled={pageInfo.page <= 1} onClick={() => goPage("prev")} className="bg-white/5 border-white/10 hover:bg-white/10 h-9">
                 <ChevronLeft size={16} className="me-1" /> {t("prev_page", lang)}
               </Button>
               <span data-testid="browse-page-indicator" className="text-sm text-slate-300 font-mono-num px-2">{t("page_label", lang)} {pageInfo.page}</span>
-              <Button data-testid="browse-next-page" disabled={!pageInfo.has_more} onClick={() => load(pageInfo.page + 1)} className="rose-btn text-white border-0 h-9">
+              <Button data-testid="browse-next-page" disabled={!pageInfo.has_more} onClick={() => goPage("next")} className="rose-btn text-white border-0 h-9">
                 {t("next_page", lang)} <ChevronRight size={16} className="ms-1" />
               </Button>
             </div>
