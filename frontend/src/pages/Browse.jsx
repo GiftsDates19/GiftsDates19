@@ -21,6 +21,7 @@ import { LANGUAGES, ZODIAC_EMOJI } from "../lib/i18n";
 import { Switch } from "../components/ui/switch";
 import CitySelect from "../components/CitySelect";
 import MultiSelect from "../components/MultiSelect";
+import RangeSlider from "../components/RangeSlider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
 
 const ALL = "all";
@@ -29,7 +30,7 @@ const VIP_EYE_COLORS = ["Brown", "Hazel", "Amber", "Green", "Blue", "Grey", "Bla
 const VIP_HAIR_COLORS = ["Black", "Dark brown", "Brown", "Light brown", "Blonde", "Platinum blonde", "Red", "Auburn", "Ginger", "Grey", "White", "Dyed / colourful"];
 const VIP_HAIRCUTS = ["Fully shaved", "Trimmed", "Landing strip", "Bikini line", "Natural / full", "Triangle"];
 const VIP_BREAST_SIZES = ["AA", "A", "B", "C", "D", "DD", "E", "F", "G", "H+", "Natural", "Enhanced"];
-const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, min_income: "", max_income: "", languages: [], bust_size: ALL, min_penis: "", max_penis: "", orientations: [], zodiac: ALL,
+const EXTRA_DEFAULT = { intent: ALL, kids: ALL, smoking: ALL, drinking: ALL, religion: ALL, min_income: "", max_income: "", languages: [], bust_sizes: [], min_penis: "", max_penis: "", orientations: [], zodiac: ALL,
   min_height: "", max_height: "", min_weight: "", max_weight: "", hobby: "", job: "", max_date_price: "", available_date: "", video_calls: false, premium_only: false, vip_only: false, with_photos: false, verified_only: false, online_now: false,
   vip_categories: [], vip_services: [], vip_min_price: "", vip_max_price: "", vip_date: "",
   vip_eye_color: ALL, vip_hair_color: ALL, vip_intimate_haircut: ALL, vip_breast_size: ALL,
@@ -103,6 +104,7 @@ export default function Browse() {
       const params = { ...filters, page: pageNum };
       if (Array.isArray(params.vip_categories)) { if (params.vip_categories.length) params.vip_categories = params.vip_categories.join(","); else delete params.vip_categories; }
       if (Array.isArray(params.vip_services)) { if (params.vip_services.length) params.vip_services = params.vip_services.join("||"); else delete params.vip_services; }
+      if (Array.isArray(params.bust_sizes)) { if (params.bust_sizes.length) params.bust_size = params.bust_sizes.join(","); delete params.bust_sizes; }
       if (Array.isArray(params.languages)) { if (params.languages.length) params.language = params.languages.join(","); delete params.languages; }
       if (Array.isArray(params.orientations)) { if (params.orientations.length) params.orientation = params.orientations.join(","); delete params.orientations; }
       if (Array.isArray(params.genders)) { if (params.genders.length) params.genders = params.genders.join(","); else delete params.genders; }
@@ -302,15 +304,22 @@ export default function Browse() {
                 <FilterSelect testid="filter-zodiac-select" field="zodiac" label={t("zodiac", lang)} value={filters.zodiac} options={ZODIAC_SIGNS} labelFn={z => `${ZODIAC_EMOJI[z] || ""} ${t("zod_" + z, lang)}`} onChange={v => setFilters({ ...filters, zodiac: v })} lang={lang} />
               </div>
               <div className="flex flex-wrap gap-3 items-end">
-                <NumInput testid="filter-min-height-input" label={`${t("height", lang)} · ${t("min", lang)}`} min="100" max="250" value={filters.min_height} onChange={v => setFilters({ ...filters, min_height: v })} />
-                <NumInput testid="filter-max-height-input" label={`${t("height", lang)} · ${t("max", lang)}`} min="100" max="250" value={filters.max_height} onChange={v => setFilters({ ...filters, max_height: v })} />
-                <NumInput testid="filter-min-weight-input" label={`${t("weight", lang)} · ${t("min", lang)}`} min="30" max="300" value={filters.min_weight} onChange={v => setFilters({ ...filters, min_weight: v })} />
-                <NumInput testid="filter-max-weight-input" label={`${t("weight", lang)} · ${t("max", lang)}`} min="30" max="300" value={filters.max_weight} onChange={v => setFilters({ ...filters, max_weight: v })} />
+                <RangeSlider testid="filter-height-range" label={t("height", lang)} min={100} max={250} lo={filters.min_height} hi={filters.max_height} anyLabel={t("all", lang)} onChange={(a, b) => setFilters(f => ({ ...f, min_height: a, max_height: b }))} />
+                <RangeSlider testid="filter-weight-range" label={t("weight", lang)} min={30} max={300} lo={filters.min_weight} hi={filters.max_weight} anyLabel={t("all", lang)} onChange={(a, b) => setFilters(f => ({ ...f, min_weight: a, max_weight: b }))} />
                 <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("hobby_filter", lang)}</label>
                   <Input data-testid="filter-hobby-input" value={filters.hobby} onChange={e => setFilters({ ...filters, hobby: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
                 <div className="min-w-[150px]"><label className="text-xs text-slate-400">{t("job_title", lang)}</label>
                   <Input data-testid="filter-job-input" value={filters.job} onChange={e => setFilters({ ...filters, job: e.target.value })} className="bg-white/5 border-white/10 mt-1" /></div>
-                {(filters.genders.length === 0 || filters.genders.some(g => g !== "male")) && <FilterSelect testid="filter-bust-select" field="bust_size" label={t("bust_size", lang)} value={filters.bust_size} options={BUST} onChange={v => setFilters({ ...filters, bust_size: v })} lang={lang} />}
+                {(filters.genders.length === 0 || filters.genders.some(g => g !== "male")) && (
+                  <div className="min-w-[200px]">
+                    <label className="text-xs text-slate-400">{t("bust_size", lang)}</label>
+                    <div className="mt-1">
+                      <MultiSelect testid="filter-bust-select" value={filters.bust_sizes} onChange={v => setFilters({ ...filters, bust_sizes: v })}
+                        options={BUST.map(b => ({ value: b, label: optLabel("bust_size", b, lang) }))}
+                        placeholder={t("all", lang)} searchPlaceholder={t("search", lang)} emptyText={t("no_results", lang)} accent="rose" />
+                    </div>
+                  </div>
+                )}
                 {(filters.genders.length === 0 || filters.genders.some(g => g !== "female")) && (<>
                   <NumInput testid="filter-min-penis-input" label={`${t("penis_size", lang)} · ${t("min", lang)}`} min="1" max="60" value={filters.min_penis} onChange={v => setFilters({ ...filters, min_penis: v })} />
                   <NumInput testid="filter-max-penis-input" label={`${t("penis_size", lang)} · ${t("max", lang)}`} min="1" max="60" value={filters.max_penis} onChange={v => setFilters({ ...filters, max_penis: v })} />
@@ -430,11 +439,9 @@ export default function Browse() {
               <FilterSelect testid="vip-filter-haircut" field="vip_intimate_haircut" label={t("vip_intimate_haircut", lang)} value={filters.vip_intimate_haircut} options={VIP_HAIRCUTS} labelFn={o => o} onChange={v => setFilters({ ...filters, vip_intimate_haircut: v })} lang={lang} />
               <FilterSelect testid="vip-filter-breast" field="vip_breast_size" label={t("vip_breast_size", lang)} value={filters.vip_breast_size} options={VIP_BREAST_SIZES} labelFn={o => o} onChange={v => setFilters({ ...filters, vip_breast_size: v })} lang={lang} />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
-              <NumInput testid="vip-filter-min-height" label={`${t("height", lang)} · ${t("min", lang)}`} min="100" max="250" value={filters.vip_min_height} onChange={v => setFilters({ ...filters, vip_min_height: v })} />
-              <NumInput testid="vip-filter-max-height" label={`${t("height", lang)} · ${t("max", lang)}`} min="100" max="250" value={filters.vip_max_height} onChange={v => setFilters({ ...filters, vip_max_height: v })} />
-              <NumInput testid="vip-filter-min-weight" label={`${t("weight", lang)} · ${t("min", lang)}`} min="30" max="400" value={filters.vip_min_weight} onChange={v => setFilters({ ...filters, vip_min_weight: v })} />
-              <NumInput testid="vip-filter-max-weight" label={`${t("weight", lang)} · ${t("max", lang)}`} min="30" max="400" value={filters.vip_max_weight} onChange={v => setFilters({ ...filters, vip_max_weight: v })} />
+            <div className="flex flex-wrap gap-6 items-end">
+              <RangeSlider testid="vip-filter-height-range" label={t("height", lang)} min={100} max={250} lo={filters.vip_min_height} hi={filters.vip_max_height} anyLabel={t("all", lang)} onChange={(a, b) => setFilters(f => ({ ...f, vip_min_height: a, vip_max_height: b }))} />
+              <RangeSlider testid="vip-filter-weight-range" label={t("weight", lang)} min={30} max={400} lo={filters.vip_min_weight} hi={filters.vip_max_weight} anyLabel={t("all", lang)} onChange={(a, b) => setFilters(f => ({ ...f, vip_min_weight: a, vip_max_weight: b }))} />
             </div>
             {(filters.genders.length === 0 || filters.genders.some(g => g !== "female")) && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">

@@ -1539,8 +1539,12 @@ async def list_profiles(
             conds.append({"$or": [{"gender": {"$in": glist}}, {"genders": {"$in": glist}}]})
     if q: conds.append({"$or": [{"name": {"$regex": q, "$options": "i"}}, {"bio": {"$regex": q, "$options": "i"}}]})
     for field, val in (("kids", kids), ("smoking", smoking), ("religion", religion),
-                       ("drinking", drinking), ("income", income), ("bust_size", bust_size), ("penis_size", penis_size)):
+                       ("drinking", drinking), ("income", income), ("penis_size", penis_size)):
         if val and val != "all": conds.append({field: val})
+    if bust_size and bust_size != "all":
+        # Multi-select: comma-separated bust sizes, match ANY
+        blist = [b.strip() for b in bust_size.split(",") if b.strip() and b.strip() != "all"]
+        if blist: conds.append({"bust_size": {"$in": blist}})
     # Orientation & relationship-intent are multi-select profile fields (stored as arrays),
     # with a legacy single value kept for backward compatibility — match either.
     if intent and intent != "all":
