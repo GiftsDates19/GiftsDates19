@@ -1502,6 +1502,7 @@ async def list_profiles(
     max_distance: Optional[int] = None, sort: Optional[str] = None,
     origin_lat: Optional[float] = None, origin_lng: Optional[float] = None,
     online_nearby: bool = False,
+    min_income: Optional[float] = None, max_income: Optional[float] = None,
     limit: int = 40, page: int = 1, user=Depends(get_current_user)
 ):
     conds = [{"id": {"$ne": user["id"]}}, {"age": {"$gte": min_age, "$lte": max_age}},
@@ -1512,7 +1513,7 @@ async def list_profiles(
     lite_used = any(v not in (None, "", "all", False, 0) for v in (intent, max_distance, available_date, max_date_price))
     if lite_used and not has_premium(user): raise HTTPException(403, "PREMIUM_LITE_REQUIRED")
     # Full Premium / VIP: search by name + every other advanced filter.
-    advanced_used = any(v not in (None, "", "all", False) for v in (q, min_height, max_height, kids, smoking, religion, drinking, income, language, orientation,
+    advanced_used = any(v not in (None, "", "all", False) for v in (q, min_income, max_income, min_height, max_height, kids, smoking, religion, drinking, income, language, orientation,
                                                                    hobby, job, min_weight, max_weight, bust_size, penis_size, premium_only, with_photos, verified_only, online_now,
                                                                    zodiac, video_calls,
                                                                    vip_categories, vip_min_price, vip_max_price, vip_date))
@@ -1611,6 +1612,9 @@ async def list_profiles(
         conds.append(_num_range_cond("$vip.dick_size", vip_min_dick, vip_max_dick))
     if vip_min_girth is not None or vip_max_girth is not None:
         conds.append(_num_range_cond("$vip.dick_girth", vip_min_girth, vip_max_girth))
+    # Income ($/month) range — profile stores a free-text amount in income_custom
+    if min_income is not None or max_income is not None:
+        conds.append(_num_range_cond({"$replaceAll": {"input": {"$toString": {"$ifNull": ["$income_custom", ""]}}, "find": ",", "replacement": ""}}, min_income, max_income))
     proj = {"_id": 0, "password": 0, "email": 0, "referred_by": 0, "referral_code": 0}
     _not_premium = [{"$or": [{"premium_until": None}, {"premium_until": {"$lte": now_iso}}, {"premium_until": {"$exists": False}}]}]
     _not_lite = [{"$or": [{"premium_lite_until": None}, {"premium_lite_until": {"$lte": now_iso}}, {"premium_lite_until": {"$exists": False}}]}]
