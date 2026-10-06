@@ -1504,6 +1504,7 @@ async def list_profiles(
     online_nearby: bool = False,
     min_income: Optional[float] = None, max_income: Optional[float] = None,
     min_penis: Optional[float] = None, max_penis: Optional[float] = None,
+    hobbies: Optional[str] = None,
     limit: int = 40, page: int = 1, user=Depends(get_current_user)
 ):
     conds = [{"id": {"$ne": user["id"]}}, {"age": {"$gte": min_age, "$lte": max_age}},
@@ -1514,7 +1515,7 @@ async def list_profiles(
     lite_used = any(v not in (None, "", "all", False, 0) for v in (intent, max_distance, available_date, max_date_price))
     if lite_used and not has_premium(user): raise HTTPException(403, "PREMIUM_LITE_REQUIRED")
     # Full Premium / VIP: search by name + every other advanced filter.
-    advanced_used = any(v not in (None, "", "all", False) for v in (q, min_income, max_income, min_penis, max_penis, min_height, max_height, kids, smoking, religion, drinking, income, language, orientation,
+    advanced_used = any(v not in (None, "", "all", False) for v in (q, hobbies, min_income, max_income, min_penis, max_penis, min_height, max_height, kids, smoking, religion, drinking, income, language, orientation,
                                                                    hobby, job, min_weight, max_weight, bust_size, penis_size, premium_only, with_photos, verified_only, online_now,
                                                                    zodiac, video_calls,
                                                                    vip_categories, vip_min_price, vip_max_price, vip_date))
@@ -1562,6 +1563,10 @@ async def list_profiles(
     if available_date: conds.append({"availability": available_date})
     if video_calls: conds.append({"video_calls_enabled": {"$ne": False}})
     if hobby: conds.append({"hobbies": {"$elemMatch": {"$regex": re.escape(hobby), "$options": "i"}}})
+    if hobbies:
+        # Multi-select from the profile hobby catalog ("||"-separated), match profiles having ANY of them
+        hlist = [h.strip() for h in hobbies.split("||") if h.strip()][:10]  # max 10, same as profile
+        if hlist: conds.append({"hobbies": {"$in": hlist}})
     if job: conds.append({"job_title": {"$regex": re.escape(job), "$options": "i"}})
     for field, lo, hi in (("height", min_height, max_height), ("weight", min_weight, max_weight)):
         if lo or hi:
